@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C1 hoàn thành — tiếp theo C2 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C2 hoàn thành — tiếp theo C3 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -83,6 +83,7 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-004 | Worker chỉ phát typed event/snapshot; Task Manager là nơi duy nhất đổi state | Tránh race condition và UI/worker tự gán status tùy ý. |
 | D-005 | Adapter nhận/trả model chuẩn hóa, không phát tán raw yt-dlp dict hoặc stderr | Cô lập dependency thay đổi thường xuyên và giữ application API ổn định. |
 | D-006 | Pause chỉ xuất hiện sau khi semantics resume từ partial file được kiểm chứng | Không hứa một action mà backend không thực hiện đáng tin cậy. |
+| D-007 | Mọi task mutation dùng optimistic aggregate replacement; repository commit trước khi publish event | Repository luôn là nguồn state có thẩm quyền. Event delivery lỗi không rollback state; caller phải refresh trước khi thử lại command. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -167,13 +168,13 @@ Checkpoint đề xuất: `feat(core): define download domain and lifecycle`
 
 Mục tiêu: định nghĩa core API ổn định để infrastructure và UI phát triển độc lập.
 
-- [ ] **C2.1** Định nghĩa các port thực sự cần dùng: analyzer, downloader, media processor, task repository, settings store, event publisher và clock.
-- [ ] **C2.2** Định nghĩa typed application events: analysis result/failure, task queued, state changed, progress changed, output ready và task failed.
-- [ ] **C2.3** Xây use case `AnalyzeUrl`; hỗ trợ cancel operation và không persist raw metadata.
-- [ ] **C2.4** Xây use case tạo `DownloadRequest` và enqueue task từ normalized media/preset.
-- [ ] **C2.5** Xây command/query contracts cho cancel, retry, resume, lấy downloads và history.
-- [ ] **C2.6** Định nghĩa transaction/state ownership: repository commit trước hay sau event phải có quy tắc nhất quán.
-- [ ] **C2.7** Viết fake adapters và contract tests cho use cases, không cần yt-dlp/FFmpeg thật.
+- [x] **C2.1** Định nghĩa các port thực sự cần dùng: analyzer, downloader, media processor, task repository, settings store, event publisher và clock.
+- [x] **C2.2** Định nghĩa typed application events: analysis result/failure, task queued, state changed, progress changed, output ready và task failed.
+- [x] **C2.3** Xây use case `AnalyzeUrl`; hỗ trợ cancel operation và không persist raw metadata.
+- [x] **C2.4** Xây use case tạo `DownloadRequest` và enqueue task từ normalized media/preset.
+- [x] **C2.5** Xây command/query contracts cho cancel, retry, resume, lấy downloads và history.
+- [x] **C2.6** Định nghĩa transaction/state ownership: repository commit trước hay sau event phải có quy tắc nhất quán.
+- [x] **C2.7** Viết fake adapters và contract tests cho use cases, không cần yt-dlp/FFmpeg thật.
 
 Acceptance criteria:
 
@@ -393,6 +394,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-06 — C2 hoàn thành:** Tạo application API thuần Python gồm analyzer/downloader/media processor/task repository/settings/event/clock ports; typed analysis/task/progress/output/failure events; và các use case analyze, enqueue, cancel, retry, resume, downloads/history query. Analysis hỗ trợ cancellation token và chỉ trao đổi normalized outcome; task mutation dùng optimistic aggregate replacement, commit repository trước khi publish event. Fake adapters xác nhận luồng analyzer → queued task hoàn toàn offline, event không chứa raw dict/`Any` và application import không kéo framework/infrastructure. Toàn bộ Ruff, mypy strict, 128 offline tests và dependency checks chạy xanh trên Windows.
 - **2026-09-06 — C1 hoàn thành:** Tạo domain thuần Python với typed identifiers/boundary values, normalized media và preset models, immutable `DownloadRequest`, lifecycle riêng cho analysis, cùng state machine cho download task/attempt. Retry tạo attempt mới và chỉ cho phép failure retryable; progress dùng unit rõ ràng và giữ `None` cho giá trị chưa biết; failure dùng taxonomy/code an toàn thay vì raw exception. Ma trận 64 cặp transition và các invariant lifecycle được kiểm thử; toàn bộ 112 offline tests, Ruff, mypy strict, lock/dependency check đều chạy xanh trên Windows.
 - **2026-09-06 — C0 hoàn thành:** Chọn Python 3.13 x64; PySide6 6.11.2 và yt-dlp 2026.8.19 import thành công trên Python 3.13.2. Tạo package, pyproject, uv.lock, Windows CI và README. Logging UTF-8 JSON có rotation, allowlist event/context và fallback an toàn khi ghi thất bại. Hai môi trường sạch (editable và wheel không editable) đều đạt Ruff format/lint, mypy strict, 9 offline tests và dependency check. GitHub CI được cấu hình; kết quả chạy remote được theo dõi riêng, không suy ra từ local tests.
 - **2026-09-06:** Phân tích `docs/overview.md` và `docs/ui-ux.md`; lập roadmap Core V1 theo dependency, acceptance criteria, risk và checkpoint commit.
