@@ -25,7 +25,11 @@ class FailureCategory(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Failure:
-    """A sanitized machine-readable failure; raw third-party details stay outside it."""
+    """A sanitized machine-readable failure; raw third-party details stay outside it.
+
+    ``code`` is the persisted detail and must be a stable, secret-free identifier,
+    never an exception message or provider response.
+    """
 
     category: FailureCategory
     code: str
