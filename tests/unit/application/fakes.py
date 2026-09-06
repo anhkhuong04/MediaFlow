@@ -6,6 +6,8 @@ from mediaflow.application import (
     ApplicationSettings,
     CancellationToken,
     DownloadArtifact,
+    DownloadJob,
+    DownloadOutcome,
     ProgressSink,
     TaskRepositoryConflict,
 )
@@ -119,12 +121,13 @@ class FakeDownloader:
 
     def download(
         self,
-        request: DownloadRequest,
+        job: DownloadJob,
         *,
         progress: ProgressSink,
         cancellation: CancellationToken,
-    ) -> DownloadArtifact:
-        return self.result
+    ) -> DownloadOutcome:
+        del job, progress, cancellation
+        return DownloadOutcome.succeeded(self.result)
 
 
 @dataclass(slots=True)

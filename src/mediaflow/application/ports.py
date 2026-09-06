@@ -8,7 +8,13 @@ Qt concepts.
 from typing import Protocol
 
 from mediaflow.application.events import ApplicationEvent
-from mediaflow.application.models import AnalysisOutcome, ApplicationSettings, DownloadArtifact
+from mediaflow.application.models import (
+    AnalysisOutcome,
+    ApplicationSettings,
+    DownloadArtifact,
+    DownloadJob,
+    DownloadOutcome,
+)
 from mediaflow.domain import (
     DownloadRequest,
     DownloadTask,
@@ -41,11 +47,11 @@ class Analyzer(Protocol):
 class Downloader(Protocol):
     def download(
         self,
-        request: DownloadRequest,
+        job: DownloadJob,
         *,
         progress: ProgressSink,
         cancellation: CancellationToken,
-    ) -> DownloadArtifact: ...
+    ) -> DownloadOutcome: ...
 
 
 class MediaProcessor(Protocol):

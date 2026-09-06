@@ -1,5 +1,10 @@
 """Public framework-independent application API."""
 
+from mediaflow.application.download_manager import (
+    CancellationSignal,
+    DownloadManager,
+    ProgressPolicy,
+)
 from mediaflow.application.events import (
     AnalysisFailed,
     AnalysisSucceeded,
@@ -17,7 +22,14 @@ from mediaflow.application.format_availability import (
     check_preset_availability,
     require_preset_available,
 )
-from mediaflow.application.models import AnalysisOutcome, ApplicationSettings, DownloadArtifact
+from mediaflow.application.models import (
+    AnalysisOutcome,
+    ApplicationSettings,
+    DownloadArtifact,
+    DownloadJob,
+    DownloadOutcome,
+    PartialFilePolicy,
+)
 from mediaflow.application.ports import (
     Analyzer,
     CancellationToken,
@@ -30,6 +42,7 @@ from mediaflow.application.ports import (
     TaskRepository,
     TaskRepositoryConflict,
 )
+from mediaflow.application.queue_manager import QueueManager
 from mediaflow.application.use_cases import (
     AnalyzeUrl,
     CancelDownload,
@@ -50,9 +63,13 @@ __all__ = [
     "ApplicationEvent",
     "ApplicationSettings",
     "CancelDownload",
+    "CancellationSignal",
     "CancellationToken",
     "Clock",
     "DownloadArtifact",
+    "DownloadJob",
+    "DownloadManager",
+    "DownloadOutcome",
     "Downloader",
     "EnqueueDownload",
     "EventPublisher",
@@ -60,10 +77,13 @@ __all__ = [
     "GetHistory",
     "MediaProcessor",
     "OutputReady",
+    "PartialFilePolicy",
     "PresetAvailability",
     "PresetAvailabilityIssue",
     "PresetUnavailable",
     "ProgressSink",
+    "ProgressPolicy",
+    "QueueManager",
     "ResumeDownload",
     "RetryDownload",
     "SettingsStore",

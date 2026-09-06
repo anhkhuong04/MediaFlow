@@ -1,8 +1,18 @@
 """Typed application boundary values shared with infrastructure adapters."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 
-from mediaflow.domain import DownloadPreset, Failure, MediaInfo, OutputPath, VideoPreset
+from mediaflow.domain import (
+    AttemptId,
+    DownloadPreset,
+    DownloadRequest,
+    Failure,
+    MediaInfo,
+    OutputPath,
+    TaskId,
+    VideoPreset,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +48,37 @@ class DownloadArtifact:
             raise ValueError("A download artifact must contain at least one path")
         if len(set(self.paths)) != len(self.paths):
             raise ValueError("Download artifact paths must be unique")
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadJob:
+    task_id: TaskId
+    attempt_id: AttemptId
+    request: DownloadRequest
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadOutcome:
+    artifact: DownloadArtifact | None = None
+    failure: Failure | None = None
+
+    def __post_init__(self) -> None:
+        if (self.artifact is None) == (self.failure is None):
+            raise ValueError("Download outcome must contain exactly one result")
+
+    @classmethod
+    def succeeded(cls, artifact: DownloadArtifact) -> "DownloadOutcome":
+        return cls(artifact=artifact)
+
+    @classmethod
+    def failed(cls, failure: Failure) -> "DownloadOutcome":
+        return cls(failure=failure)
+
+
+class PartialFilePolicy(StrEnum):
+    """C5 keeps partial files so cooperative resume remains possible."""
+
+    KEEP = "keep"
 
 
 @dataclass(frozen=True, slots=True)

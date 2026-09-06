@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C3 và C4 hoàn thành — tiếp theo C5 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C5 hoàn thành — tiếp theo C6 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -87,6 +87,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-008 | SQLite chỉ persist durable task facts và `updated_at` checkpoint; không persist progress snapshot, speed hoặc ETA | Giữ task/history phục hồi được nhưng tránh biến telemetry tần suất cao thành write amplification hoặc optimistic conflict giả. |
 | D-009 | Analyze cancellation là cooperative; `socket_timeout` giới hạn từng I/O, không phải hard deadline toàn operation | Phản ánh đúng giới hạn Python API của yt-dlp, không hứa khả năng cưỡng bức dừng mà adapter không bảo đảm. |
 | D-010 | Preset availability là application contract và phải hợp lệ trước enqueue; yt-dlp selector vẫn là infrastructure detail | UI nhận warning/choice typed, task không hợp lệ không lọt vào persistence, và provider format ID không vượt adapter boundary. |
+| D-011 | Queue dùng FIFO với bounded thread pool; `DownloadManager` là state owner duy nhất và quyết định kết quả atomically với cancel | Giữ scheduling dự đoán được, không chạy engine trên UI/caller thread, không vượt concurrency và để cancel thắng nếu đã được yêu cầu trước lúc settle. |
+| D-012 | Mỗi attempt tải vào staging riêng, không overwrite, giữ partial khi cancel/failure và chuyển `DOWNLOADING → PROCESSING` sau download thành công | Cho phép resume/retry an toàn; C6 vẫn phải xử lý, finalize và verify trước khi task được phép `COMPLETED`. yt-dlp auto-merge bị tắt và selector loại DRM. |
+| D-013 | Progress event coalesce tối thiểu 250 ms; durable checkpoint tối thiểu 5 giây và repository tiếp tục loại speed/ETA/snapshot | UI có telemetry đủ mượt mà không biến progress hook thành write amplification trong SQLite. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -237,14 +240,14 @@ Checkpoint đề xuất: `feat(analyzer): normalize media metadata and presets`
 
 Mục tiêu: tải nhiều task có giới hạn, progress thật và failure isolation.
 
-- [ ] **C5.1** Implement Queue Manager với configurable concurrency và scheduling deterministic.
-- [ ] **C5.2** Implement Download Manager là nơi duy nhất điều khiển task transitions.
-- [ ] **C5.3** Implement yt-dlp downloader adapter từ immutable request/selector.
-- [ ] **C5.4** Chuẩn hóa progress hook thành `ProgressSnapshot`; throttle/coalesce event và tránh database write liên tục.
-- [ ] **C5.5** Bảo đảm slot luôn được release khi success, failure hoặc cancel, kể cả khi callback lỗi.
-- [ ] **C5.6** Implement cooperative cancellation cho queued và downloading task; ghi rõ policy giữ/xóa partial file.
-- [ ] **C5.7** Cô lập worker failure và callback failure; một task lỗi không dừng scheduler.
-- [ ] **C5.8** Viết deterministic tests cho queue limit, ordering, races cơ bản, cancel và slot release.
+- [x] **C5.1** Implement Queue Manager với configurable concurrency và scheduling deterministic.
+- [x] **C5.2** Implement Download Manager là nơi duy nhất điều khiển task transitions.
+- [x] **C5.3** Implement yt-dlp downloader adapter từ immutable request/selector.
+- [x] **C5.4** Chuẩn hóa progress hook thành `ProgressSnapshot`; throttle/coalesce event và tránh database write liên tục.
+- [x] **C5.5** Bảo đảm slot luôn được release khi success, failure hoặc cancel, kể cả khi callback lỗi.
+- [x] **C5.6** Implement cooperative cancellation cho queued và downloading task; ghi rõ policy giữ/xóa partial file.
+- [x] **C5.7** Cô lập worker failure và callback failure; một task lỗi không dừng scheduler.
+- [x] **C5.8** Viết deterministic tests cho queue limit, ordering, races cơ bản, cancel và slot release.
 
 Acceptance criteria:
 
@@ -397,6 +400,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C5 hoàn thành:** Thêm Queue Manager FIFO dùng bounded `ThreadPoolExecutor`, configurable concurrency và lifecycle sở hữu tài nguyên rõ ràng; mọi download chạy trên worker thread, slot được release bằng completion callback cho success/failure/cancel. `DownloadManager` là state owner duy nhất, commit repository trước event, settle cancel/failure/success atomically và chỉ chuyển download thành công sang `PROCESSING`. yt-dlp downloader nhận immutable job/selector, dùng staging riêng theo task/attempt, không overwrite, giữ `.part` khi cancel/failure, không dùng browser cookie, loại DRM và tắt implicit merge để dành processing/final verification cho C6. Raw progress được normalize trung thực, event coalesce 250 ms, durable checkpoint 5 giây và callback/worker failure được cô lập. Stress/FIFO/race/cancel/adapter tests hoàn toàn offline; toàn bộ 236 tests chạy xanh, 1 live smoke test được deselect mặc định.
 - **2026-09-07 — C3 và C4 hoàn thành song song:** SQLite có schema normalized cho task/attempt/output, migration history liên tục có checksum và rollback từng version, repository optimistic theo durable projection, history là projection của terminal task, đồng thời mọi connection được đóng tường minh để không giữ file handle trên Windows. Analyzer yt-dlp dùng option tối thiểu, logger im lặng, cooperative cancellation và per-I/O socket timeout; metadata thiếu/sai kiểu/non-finite, playlist/subtitle/chapter/live được normalize sang model typed. Source URL giữ nguyên ý định người dùng, canonical URL tách riêng, credential-bearing URL bị chặn trước event/persistence. Format availability thuộc application, validate trước enqueue; selector hạ tầng không dùng raw format ID, không fallback resolution/video-only ngầm. Error taxonomy phân biệt unsupported, unavailable, auth, access và network; raw cause chỉ nằm trong diagnostic boundary. Toàn bộ Ruff, mypy strict, dependency checks và 206 offline tests chạy xanh; 1 live smoke test được deselect mặc định.
 - **2026-09-06 — C2 hoàn thành:** Tạo application API thuần Python gồm analyzer/downloader/media processor/task repository/settings/event/clock ports; typed analysis/task/progress/output/failure events; và các use case analyze, enqueue, cancel, retry, resume, downloads/history query. Analysis hỗ trợ cancellation token và chỉ trao đổi normalized outcome; task mutation dùng optimistic aggregate replacement, commit repository trước khi publish event. Fake adapters xác nhận luồng analyzer → queued task hoàn toàn offline, event không chứa raw dict/`Any` và application import không kéo framework/infrastructure. Toàn bộ Ruff, mypy strict, 128 offline tests và dependency checks chạy xanh trên Windows.
 - **2026-09-06 — C1 hoàn thành:** Tạo domain thuần Python với typed identifiers/boundary values, normalized media và preset models, immutable `DownloadRequest`, lifecycle riêng cho analysis, cùng state machine cho download task/attempt. Retry tạo attempt mới và chỉ cho phép failure retryable; progress dùng unit rõ ràng và giữ `None` cho giá trị chưa biết; failure dùng taxonomy/code an toàn thay vì raw exception. Ma trận 64 cặp transition và các invariant lifecycle được kiểm thử; toàn bộ 112 offline tests, Ruff, mypy strict, lock/dependency check đều chạy xanh trên Windows.

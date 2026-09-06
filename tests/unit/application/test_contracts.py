@@ -17,6 +17,8 @@ from mediaflow.application import (
     Clock,
     DownloadArtifact,
     Downloader,
+    DownloadJob,
+    DownloadOutcome,
     EventPublisher,
     MediaProcessor,
     OutputReady,
@@ -29,6 +31,7 @@ from mediaflow.application import (
     TaskStateChanged,
 )
 from mediaflow.domain import (
+    AttemptId,
     DownloadRequest,
     Failure,
     FailureCategory,
@@ -37,6 +40,7 @@ from mediaflow.domain import (
     OutputPath,
     SourceUrl,
     StreamKind,
+    TaskId,
     UtcTimestamp,
     VideoPreset,
 )
@@ -81,7 +85,10 @@ def test_fake_adapters_satisfy_every_application_port(tmp_path: Path) -> None:
     source = _source_url()
     request = DownloadRequest(source, "Media", VideoPreset(), OutputPath(tmp_path))
     assert analyzer.analyze(source, cancellation=cancellation).failure == _failure()
-    assert downloader.download(request, progress=progress, cancellation=cancellation) == artifact
+    job = DownloadJob(TaskId.new(), AttemptId.new(), request)
+    assert downloader.download(job, progress=progress, cancellation=cancellation) == (
+        DownloadOutcome.succeeded(artifact)
+    )
     assert (
         processor.process(artifact, request, progress=progress, cancellation=cancellation) == output
     )
@@ -134,6 +141,10 @@ def test_application_models_reject_ambiguous_or_empty_values(tmp_path: Path) -> 
     path = OutputPath(tmp_path / "same.file")
     with pytest.raises(ValueError):
         DownloadArtifact((path, path), requires_processing=True)
+    with pytest.raises(ValueError):
+        DownloadOutcome()
+    with pytest.raises(ValueError):
+        DownloadOutcome(artifact=DownloadArtifact((path,), False), failure=_failure())
     with pytest.raises(ValueError):
         ApplicationSettings(OutputPath(tmp_path), concurrent_downloads=0)
 
