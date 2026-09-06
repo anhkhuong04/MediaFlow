@@ -15,6 +15,7 @@ from mediaflow.domain import (
     OutputPath,
     ProgressSnapshot,
     SourceUrl,
+    StreamKind,
     TaskId,
     UtcTimestamp,
     VideoPreset,
@@ -90,7 +91,13 @@ class Session:
         if self.error is not None:
             raise self.error
         return {
-            "requested_downloads": [{"filepath": str(self.outside_path or staging / "video.webm")}]
+            "requested_downloads": [
+                {
+                    "filepath": str(self.outside_path or staging / "video.webm"),
+                    "vcodec": "vp9",
+                    "acodec": "opus",
+                }
+            ]
         }
 
 
@@ -136,6 +143,7 @@ def test_adapter_builds_safe_reproducible_options_and_normalizes_artifact(
     assert outcome.artifact is not None
     assert outcome.artifact.requires_processing
     assert len(outcome.artifact.paths) == 1
+    assert outcome.artifact.stream_kinds == (StreamKind.AUDIO_VIDEO,)
     assert sink.values[0].fraction == 0.5
     parameters = factory.calls[0]
     assert parameters["socket_timeout"] == 8

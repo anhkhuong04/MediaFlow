@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C5 hoàn thành — tiếp theo C6 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C6 hoàn thành — tiếp theo C7 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -90,6 +90,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-011 | Queue dùng FIFO với bounded thread pool; `DownloadManager` là state owner duy nhất và quyết định kết quả atomically với cancel | Giữ scheduling dự đoán được, không chạy engine trên UI/caller thread, không vượt concurrency và để cancel thắng nếu đã được yêu cầu trước lúc settle. |
 | D-012 | Mỗi attempt tải vào staging riêng, không overwrite, giữ partial khi cancel/failure và chuyển `DOWNLOADING → PROCESSING` sau download thành công | Cho phép resume/retry an toàn; C6 vẫn phải xử lý, finalize và verify trước khi task được phép `COMPLETED`. yt-dlp auto-merge bị tắt và selector loại DRM. |
 | D-013 | Progress event coalesce tối thiểu 250 ms; durable checkpoint tối thiểu 5 giây và repository tiếp tục loại speed/ETA/snapshot | UI có telemetry đủ mượt mà không biến progress hook thành write amplification trong SQLite. |
+| D-014 | Dependency executable do composition root cung cấp; mặc định dùng `PATH` khi development, không tự tải/cập nhật FFmpeg | Probe và processor dùng cùng executable rõ ràng; packaging sau này có thể chọn bundle đã kiểm chứng hoặc đường dẫn do user cấu hình mà không đổi application contract. |
+| D-015 | Queue worker thực thi trọn download → processing; completion callback chỉ thu kết quả và release slot | Loại race khiến callback của future đã hoàn tất có thể chạy trên caller/UI thread; concurrency limit bao phủ cả network, CPU và disk I/O của một task. |
+| D-016 | Final output được tạo ở temporary sibling, FFprobe trước publish, publish atomic và kiểm tra tồn tại/kích thước sau publish | `Completed` chỉ xuất hiện sau output usable; default `rename` và `skip` không overwrite, `replace` chỉ dùng khi explicit. Downloaded staging input chỉ xóa sau success, còn failure/cancel giữ lại cho processing-only retry. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -263,15 +266,15 @@ Checkpoint đề xuất: `feat(download): add queued execution and progress`
 
 Mục tiêu: tạo file cuối đáng tin cậy và phân biệt download với processing.
 
-- [ ] **C6.1** Implement dependency probe cho yt-dlp, FFmpeg và FFprobe với version/status typed.
-- [ ] **C6.2** Implement process runner dùng argument array, capture stderr/exit code, timeout và cancellation; không dựng shell string.
-- [ ] **C6.3** Implement merge video/audio và audio conversion tối thiểu phục vụ preset V1.
-- [ ] **C6.4** Implement Windows filename sanitizer: reserved names, invalid chars, trailing dot/space, collision và path-length policy.
-- [ ] **C6.5** Implement conflict policy `rename`, `skip`, `replace`; mặc định an toàn là `rename` hoặc `skip`.
-- [ ] **C6.6** Kiểm tra disk space khi ước lượng khả dụng và dùng wording/data thể hiện đây là estimate.
-- [ ] **C6.7** Finalize output atomically khi thực tế cho phép; verify file cuối bằng tồn tại/kích thước và FFprobe khi cần.
-- [ ] **C6.8** Phân loại processing failure riêng; giữ temporary inputs đủ để retry processing theo policy.
-- [ ] **C6.9** Test command args, exit mapping, cancel, filename edge cases, conflict và cleanup bằng fake process/temp directory.
+- [x] **C6.1** Implement dependency probe cho yt-dlp, FFmpeg và FFprobe với version/status typed.
+- [x] **C6.2** Implement process runner dùng argument array, capture stderr/exit code, timeout và cancellation; không dựng shell string.
+- [x] **C6.3** Implement merge video/audio và audio conversion tối thiểu phục vụ preset V1.
+- [x] **C6.4** Implement Windows filename sanitizer: reserved names, invalid chars, trailing dot/space, collision và path-length policy.
+- [x] **C6.5** Implement conflict policy `rename`, `skip`, `replace`; mặc định an toàn là `rename` hoặc `skip`.
+- [x] **C6.6** Kiểm tra disk space khi ước lượng khả dụng và dùng wording/data thể hiện đây là estimate.
+- [x] **C6.7** Finalize output atomically khi thực tế cho phép; verify file cuối bằng tồn tại/kích thước và FFprobe khi cần.
+- [x] **C6.8** Phân loại processing failure riêng; giữ temporary inputs đủ để retry processing theo policy.
+- [x] **C6.9** Test command args, exit mapping, cancel, filename edge cases, conflict và cleanup bằng fake process/temp directory.
 
 Acceptance criteria:
 
@@ -400,6 +403,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C6 hoàn thành:** Thêm dependency report typed cho yt-dlp/FFmpeg/FFprobe và probe version/status; process runner dùng argument tuple với `shell=False`, capture stdout/stderr, timeout, cooperative cancel và reap process. FFmpeg adapter hỗ trợ merge video/audio, remux combined video, M4A/MP3 conversion và copy audio gốc; mọi output được tạo ở temporary sibling, kiểm tra non-empty + FFprobe, publish atomic rồi kiểm tra final file trước khi application commit `COMPLETED`. Filename Windows xử lý invalid/control chars, reserved names, trailing dot/space, collision và path budget; conflict mặc định `rename`, `skip` không ghi file và `replace` chỉ overwrite khi explicit. Disk-space contract luôn đánh dấu estimate. Failure/cancel chỉ dọn unpublished generated output và giữ downloaded inputs; success mới dọn input staging. Queue chạy trọn download→processing trên worker, không xử lý trong future callback; processing-only retry tạo attempt `PROCESSING` mới và không gọi downloader. Toàn bộ 274 offline tests chạy xanh, 1 live smoke test deselect; probe thật trên máy phát hiện yt-dlp `2026.08.19` ready, FFmpeg/FFprobe chưa có trên `PATH`, nên FFmpeg behavior được xác nhận bằng fake runner/temp filesystem chứ chưa có live media smoke.
 - **2026-09-07 — C5 hoàn thành:** Thêm Queue Manager FIFO dùng bounded `ThreadPoolExecutor`, configurable concurrency và lifecycle sở hữu tài nguyên rõ ràng; mọi download chạy trên worker thread, slot được release bằng completion callback cho success/failure/cancel. `DownloadManager` là state owner duy nhất, commit repository trước event, settle cancel/failure/success atomically và chỉ chuyển download thành công sang `PROCESSING`. yt-dlp downloader nhận immutable job/selector, dùng staging riêng theo task/attempt, không overwrite, giữ `.part` khi cancel/failure, không dùng browser cookie, loại DRM và tắt implicit merge để dành processing/final verification cho C6. Raw progress được normalize trung thực, event coalesce 250 ms, durable checkpoint 5 giây và callback/worker failure được cô lập. Stress/FIFO/race/cancel/adapter tests hoàn toàn offline; toàn bộ 236 tests chạy xanh, 1 live smoke test được deselect mặc định.
 - **2026-09-07 — C3 và C4 hoàn thành song song:** SQLite có schema normalized cho task/attempt/output, migration history liên tục có checksum và rollback từng version, repository optimistic theo durable projection, history là projection của terminal task, đồng thời mọi connection được đóng tường minh để không giữ file handle trên Windows. Analyzer yt-dlp dùng option tối thiểu, logger im lặng, cooperative cancellation và per-I/O socket timeout; metadata thiếu/sai kiểu/non-finite, playlist/subtitle/chapter/live được normalize sang model typed. Source URL giữ nguyên ý định người dùng, canonical URL tách riêng, credential-bearing URL bị chặn trước event/persistence. Format availability thuộc application, validate trước enqueue; selector hạ tầng không dùng raw format ID, không fallback resolution/video-only ngầm. Error taxonomy phân biệt unsupported, unavailable, auth, access và network; raw cause chỉ nằm trong diagnostic boundary. Toàn bộ Ruff, mypy strict, dependency checks và 206 offline tests chạy xanh; 1 live smoke test được deselect mặc định.
 - **2026-09-06 — C2 hoàn thành:** Tạo application API thuần Python gồm analyzer/downloader/media processor/task repository/settings/event/clock ports; typed analysis/task/progress/output/failure events; và các use case analyze, enqueue, cancel, retry, resume, downloads/history query. Analysis hỗ trợ cancellation token và chỉ trao đổi normalized outcome; task mutation dùng optimistic aggregate replacement, commit repository trước khi publish event. Fake adapters xác nhận luồng analyzer → queued task hoàn toàn offline, event không chứa raw dict/`Any` và application import không kéo framework/infrastructure. Toàn bộ Ruff, mypy strict, 128 offline tests và dependency checks chạy xanh trên Windows.

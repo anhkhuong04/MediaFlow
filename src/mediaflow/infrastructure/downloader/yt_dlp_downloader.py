@@ -20,7 +20,14 @@ from mediaflow.application import (
     PartialFilePolicy,
     ProgressSink,
 )
-from mediaflow.domain import Failure, FailureCategory, OutputPath, ProgressSnapshot, UtcTimestamp
+from mediaflow.domain import (
+    Failure,
+    FailureCategory,
+    OutputPath,
+    ProgressSnapshot,
+    StreamKind,
+    UtcTimestamp,
+)
 from mediaflow.infrastructure.downloader.format_selection import build_format_selection
 
 _LOGGER = logging.getLogger("mediaflow.download")
@@ -282,19 +289,24 @@ def _normalize_artifact(
     raw = _as_mapping(raw_result)
     if raw is None:
         raise ValueError("yt-dlp result must be a mapping")
-    candidates: list[object] = []
+    candidates: list[tuple[object, StreamKind | None]] = []
     requested = raw.get("requested_downloads")
     if isinstance(requested, Sequence) and not isinstance(requested, (str, bytes)):
         for item in requested:
             mapping = _as_mapping(item)
             if mapping is not None:
-                candidates.extend((mapping.get("filepath"), mapping.get("_filename")))
-    candidates.extend((raw.get("filepath"), raw.get("_filename")))
+                kind = _artifact_stream_kind(mapping)
+                candidates.extend(
+                    ((mapping.get("filepath"), kind), (mapping.get("_filename"), kind))
+                )
+    root_kind = _artifact_stream_kind(raw)
+    candidates.extend(((raw.get("filepath"), root_kind), (raw.get("_filename"), root_kind)))
 
     staging_root = staging_directory.resolve(strict=False)
     paths: list[OutputPath] = []
+    kinds: list[StreamKind | None] = []
     seen: set[Path] = set()
-    for candidate in candidates:
+    for candidate, kind in candidates:
         if not isinstance(candidate, str) or not candidate.strip():
             continue
         path = Path(candidate).resolve(strict=False)
@@ -303,7 +315,25 @@ def _normalize_artifact(
         if path not in seen:
             seen.add(path)
             paths.append(OutputPath(path))
-    return DownloadArtifact(tuple(paths), requires_processing=requires_processing)
+            kinds.append(kind)
+    normalized_kinds = tuple(kinds) if kinds and all(kind is not None for kind in kinds) else ()
+    return DownloadArtifact(
+        tuple(paths),
+        requires_processing=requires_processing,
+        stream_kinds=cast(tuple[StreamKind, ...], normalized_kinds),
+    )
+
+
+def _artifact_stream_kind(raw: Mapping[str, object]) -> StreamKind | None:
+    video = isinstance(raw.get("vcodec"), str) and raw.get("vcodec") != "none"
+    audio = isinstance(raw.get("acodec"), str) and raw.get("acodec") != "none"
+    if video and audio:
+        return StreamKind.AUDIO_VIDEO
+    if video:
+        return StreamKind.VIDEO
+    if audio:
+        return StreamKind.AUDIO
+    return None
 
 
 def _map_os_error(error: OSError) -> Failure:

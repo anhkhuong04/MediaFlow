@@ -25,15 +25,24 @@ from mediaflow.application.format_availability import (
 from mediaflow.application.models import (
     AnalysisOutcome,
     ApplicationSettings,
+    ConflictPolicy,
+    DependencyComponent,
+    DependencyInfo,
+    DependencyReport,
+    DependencyState,
+    DiskSpaceEstimate,
     DownloadArtifact,
     DownloadJob,
     DownloadOutcome,
     PartialFilePolicy,
+    ProcessingJob,
+    ProcessingOutcome,
 )
 from mediaflow.application.ports import (
     Analyzer,
     CancellationToken,
     Clock,
+    DependencyProbe,
     Downloader,
     EventPublisher,
     MediaProcessor,
@@ -42,6 +51,7 @@ from mediaflow.application.ports import (
     TaskRepository,
     TaskRepositoryConflict,
 )
+from mediaflow.application.processing_manager import ProcessingManager
 from mediaflow.application.queue_manager import QueueManager
 from mediaflow.application.use_cases import (
     AnalyzeUrl,
@@ -66,6 +76,13 @@ __all__ = [
     "CancellationSignal",
     "CancellationToken",
     "Clock",
+    "ConflictPolicy",
+    "DependencyComponent",
+    "DependencyInfo",
+    "DependencyProbe",
+    "DependencyReport",
+    "DependencyState",
+    "DiskSpaceEstimate",
     "DownloadArtifact",
     "DownloadJob",
     "DownloadManager",
@@ -83,6 +100,9 @@ __all__ = [
     "PresetUnavailable",
     "ProgressSink",
     "ProgressPolicy",
+    "ProcessingJob",
+    "ProcessingManager",
+    "ProcessingOutcome",
     "QueueManager",
     "ResumeDownload",
     "RetryDownload",

@@ -11,19 +11,13 @@ from mediaflow.application.events import ApplicationEvent
 from mediaflow.application.models import (
     AnalysisOutcome,
     ApplicationSettings,
-    DownloadArtifact,
+    DependencyReport,
     DownloadJob,
     DownloadOutcome,
+    ProcessingJob,
+    ProcessingOutcome,
 )
-from mediaflow.domain import (
-    DownloadRequest,
-    DownloadTask,
-    OutputPath,
-    ProgressSnapshot,
-    SourceUrl,
-    TaskId,
-    UtcTimestamp,
-)
+from mediaflow.domain import DownloadTask, ProgressSnapshot, SourceUrl, TaskId, UtcTimestamp
 
 
 class TaskRepositoryConflict(RuntimeError):
@@ -57,12 +51,15 @@ class Downloader(Protocol):
 class MediaProcessor(Protocol):
     def process(
         self,
-        artifact: DownloadArtifact,
-        request: DownloadRequest,
+        job: ProcessingJob,
         *,
         progress: ProgressSink,
         cancellation: CancellationToken,
-    ) -> OutputPath: ...
+    ) -> ProcessingOutcome: ...
+
+
+class DependencyProbe(Protocol):
+    def probe(self) -> DependencyReport: ...
 
 
 class TaskRepository(Protocol):

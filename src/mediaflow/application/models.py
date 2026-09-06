@@ -10,6 +10,7 @@ from mediaflow.domain import (
     Failure,
     MediaInfo,
     OutputPath,
+    StreamKind,
     TaskId,
     VideoPreset,
 )
@@ -41,13 +42,17 @@ class DownloadArtifact:
 
     paths: tuple[OutputPath, ...]
     requires_processing: bool
+    stream_kinds: tuple[StreamKind, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "paths", tuple(self.paths))
+        object.__setattr__(self, "stream_kinds", tuple(self.stream_kinds))
         if not self.paths:
             raise ValueError("A download artifact must contain at least one path")
         if len(set(self.paths)) != len(self.paths):
             raise ValueError("Download artifact paths must be unique")
+        if self.stream_kinds and len(self.stream_kinds) != len(self.paths):
+            raise ValueError("Stream kinds must align with artifact paths")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +84,96 @@ class PartialFilePolicy(StrEnum):
     """C5 keeps partial files so cooperative resume remains possible."""
 
     KEEP = "keep"
+
+
+class ConflictPolicy(StrEnum):
+    RENAME = "rename"
+    SKIP = "skip"
+    REPLACE = "replace"
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessingJob:
+    task_id: TaskId
+    attempt_id: AttemptId
+    request: DownloadRequest
+    artifact: DownloadArtifact
+    conflict_policy: ConflictPolicy = ConflictPolicy.RENAME
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessingOutcome:
+    output_path: OutputPath | None = None
+    failure: Failure | None = None
+
+    def __post_init__(self) -> None:
+        if (self.output_path is None) == (self.failure is None):
+            raise ValueError("Processing outcome must contain exactly one result")
+
+    @classmethod
+    def succeeded(cls, output_path: OutputPath) -> "ProcessingOutcome":
+        return cls(output_path=output_path)
+
+    @classmethod
+    def failed(cls, failure: Failure) -> "ProcessingOutcome":
+        return cls(failure=failure)
+
+
+@dataclass(frozen=True, slots=True)
+class DiskSpaceEstimate:
+    """Estimated output requirement compared with a point-in-time free-space value."""
+
+    required_bytes: int
+    available_bytes: int
+    is_estimate: bool = True
+
+    def __post_init__(self) -> None:
+        if self.required_bytes < 0 or self.available_bytes < 0:
+            raise ValueError("Disk-space byte values cannot be negative")
+        if not self.is_estimate:
+            raise ValueError("C6 disk-space checks are estimates")
+
+    @property
+    def is_sufficient(self) -> bool:
+        return self.available_bytes >= self.required_bytes
+
+
+class DependencyComponent(StrEnum):
+    YT_DLP = "yt-dlp"
+    FFMPEG = "ffmpeg"
+    FFPROBE = "ffprobe"
+
+
+class DependencyState(StrEnum):
+    READY = "ready"
+    NOT_FOUND = "not_found"
+    UNUSABLE = "unusable"
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyInfo:
+    component: DependencyComponent
+    state: DependencyState
+    version: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.state is DependencyState.READY and not self.version:
+            raise ValueError("A ready dependency requires a version")
+        if self.state is not DependencyState.READY and self.version is not None:
+            raise ValueError("An unavailable dependency cannot expose a version")
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyReport:
+    dependencies: tuple[DependencyInfo, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "dependencies", tuple(self.dependencies))
+        components = tuple(item.component for item in self.dependencies)
+        if set(components) != set(DependencyComponent) or len(components) != len(
+            DependencyComponent
+        ):
+            raise ValueError("Dependency report must contain each component exactly once")
 
 
 @dataclass(frozen=True, slots=True)

@@ -66,6 +66,31 @@ def test_video_preset_fields_round_trip(tmp_path: Path) -> None:
     assert repository.get(task.task_id) == task
 
 
+def test_processing_only_retry_attempt_round_trips_without_schema_change(
+    tmp_path: Path,
+) -> None:
+    repository = SQLiteTaskRepository(tmp_path / "mediaflow.db")
+    processing = (
+        _task(tmp_path)
+        .transition(TaskState.DOWNLOADING, at=_at(1))
+        .transition(TaskState.PROCESSING, at=_at(2))
+    )
+    failed = processing.transition(
+        TaskState.FAILED,
+        at=_at(3),
+        failure=Failure(
+            FailureCategory.PROCESSING,
+            "processing.ffmpeg_failed",
+            retryable=True,
+        ),
+    )
+    retried = failed.retry_processing(attempt_id=AttemptId.new(), at=_at(4))
+
+    repository.add(retried)
+
+    assert SQLiteTaskRepository(tmp_path / "mediaflow.db").get(retried.task_id) == retried
+
+
 def test_schema_persists_typed_source_but_has_no_auth_payload_columns(tmp_path: Path) -> None:
     database_path = tmp_path / "mediaflow.db"
     repository = SQLiteTaskRepository(database_path)

@@ -5,15 +5,17 @@ from mediaflow.application import (
     ApplicationEvent,
     ApplicationSettings,
     CancellationToken,
+    DependencyReport,
     DownloadArtifact,
     DownloadJob,
     DownloadOutcome,
+    ProcessingJob,
+    ProcessingOutcome,
     ProgressSink,
     TaskRepositoryConflict,
 )
 from mediaflow.domain import (
     TERMINAL_STATES,
-    DownloadRequest,
     DownloadTask,
     OutputPath,
     ProgressSnapshot,
@@ -136,13 +138,21 @@ class FakeMediaProcessor:
 
     def process(
         self,
-        artifact: DownloadArtifact,
-        request: DownloadRequest,
+        job: ProcessingJob,
         *,
         progress: ProgressSink,
         cancellation: CancellationToken,
-    ) -> OutputPath:
-        return self.result
+    ) -> ProcessingOutcome:
+        del job, progress, cancellation
+        return ProcessingOutcome.succeeded(self.result)
+
+
+@dataclass(slots=True)
+class FakeDependencyProbe:
+    report: DependencyReport
+
+    def probe(self) -> DependencyReport:
+        return self.report
 
 
 @dataclass(slots=True)

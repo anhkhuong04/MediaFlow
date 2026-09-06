@@ -174,6 +174,63 @@ def test_retry_requires_terminal_retryable_task_and_unique_id(tmp_path: Path) ->
         non_retryable.retry(attempt_id=attempt_id(2), at=at(2))
 
 
+def test_processing_retry_starts_new_processing_attempt_and_preserves_request(
+    tmp_path: Path,
+) -> None:
+    processing = (
+        create_task(tmp_path)
+        .transition(TaskState.DOWNLOADING, at=at(1))
+        .transition(TaskState.PROCESSING, at=at(2))
+    )
+    failed = processing.transition(
+        TaskState.FAILED,
+        at=at(3),
+        failure=Failure(
+            FailureCategory.PROCESSING,
+            "processing.ffmpeg_failed",
+            retryable=True,
+        ),
+    )
+
+    retried = failed.retry_processing(attempt_id=attempt_id(2), at=at(4))
+
+    assert retried.request is failed.request
+    assert retried.state is TaskState.PROCESSING
+    assert retried.current_attempt.number == 2
+    assert retried.attempts[0] == failed.current_attempt
+    with pytest.raises(InvalidTaskTransition):
+        failed.retry(attempt_id=attempt_id(3), at=at(4))
+
+
+def test_processing_retry_rejects_nonprocessing_or_nonretryable_failure(
+    tmp_path: Path,
+) -> None:
+    download_failure = create_task(tmp_path).transition(
+        TaskState.FAILED,
+        at=at(1),
+        failure=Failure(FailureCategory.DOWNLOAD, "download.failed", retryable=True),
+    )
+    processing = (
+        create_task(tmp_path)
+        .transition(TaskState.DOWNLOADING, at=at(1))
+        .transition(TaskState.PROCESSING, at=at(2))
+    )
+    nonretryable = processing.transition(
+        TaskState.FAILED,
+        at=at(3),
+        failure=Failure(
+            FailureCategory.PROCESSING,
+            "processing.invalid_input",
+            retryable=False,
+        ),
+    )
+
+    with pytest.raises(InvalidTaskTransition):
+        download_failure.retry_processing(attempt_id=attempt_id(2), at=at(2))
+    with pytest.raises(InvalidTaskTransition):
+        nonretryable.retry_processing(attempt_id=attempt_id(2), at=at(4))
+
+
 def test_transition_requires_failure_or_verified_output_as_appropriate(tmp_path: Path) -> None:
     queued = create_task(tmp_path)
     with pytest.raises(ValueError):

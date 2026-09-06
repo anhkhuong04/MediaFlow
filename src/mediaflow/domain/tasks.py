@@ -191,6 +191,12 @@ class DownloadTask:
             current.failure is None or not current.failure.retryable
         ):
             raise InvalidTaskTransition("A non-retryable failure cannot start a retry attempt")
+        if (
+            current.state is TaskState.FAILED
+            and current.failure is not None
+            and current.failure.code.startswith("processing.")
+        ):
+            raise InvalidTaskTransition("A processing failure requires a processing-only retry")
         _require_not_before(at, current.updated_at)
         if any(attempt.attempt_id == attempt_id for attempt in self.attempts):
             raise ValueError("Retry attempt ID must be unique")
@@ -198,6 +204,29 @@ class DownloadTask:
             attempt_id=attempt_id,
             number=current.number + 1,
             state=TaskState.QUEUED,
+            created_at=at,
+            updated_at=at,
+        )
+        return replace(self, attempts=(*self.attempts, retry_attempt))
+
+    def retry_processing(self, *, attempt_id: AttemptId, at: UtcTimestamp) -> "DownloadTask":
+        """Start a new processing attempt without repeating a successful download."""
+
+        current = self.current_attempt
+        if (
+            current.state is not TaskState.FAILED
+            or current.failure is None
+            or not current.failure.code.startswith("processing.")
+            or not current.failure.retryable
+        ):
+            raise InvalidTaskTransition("Only retryable processing failures can retry processing")
+        _require_not_before(at, current.updated_at)
+        if any(attempt.attempt_id == attempt_id for attempt in self.attempts):
+            raise ValueError("Retry attempt ID must be unique")
+        retry_attempt = DownloadAttempt(
+            attempt_id=attempt_id,
+            number=current.number + 1,
+            state=TaskState.PROCESSING,
             created_at=at,
             updated_at=at,
         )

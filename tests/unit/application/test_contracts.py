@@ -15,6 +15,12 @@ from mediaflow.application import (
     ApplicationSettings,
     CancellationToken,
     Clock,
+    DependencyComponent,
+    DependencyInfo,
+    DependencyProbe,
+    DependencyReport,
+    DependencyState,
+    DiskSpaceEstimate,
     DownloadArtifact,
     Downloader,
     DownloadJob,
@@ -22,6 +28,8 @@ from mediaflow.application import (
     EventPublisher,
     MediaProcessor,
     OutputReady,
+    ProcessingJob,
+    ProcessingOutcome,
     ProgressSink,
     SettingsStore,
     TaskFailed,
@@ -49,6 +57,7 @@ from tests.unit.application.fakes import (
     FakeAnalyzer,
     FakeCancellationToken,
     FakeClock,
+    FakeDependencyProbe,
     FakeDownloader,
     FakeMediaProcessor,
     FakeProgressSink,
@@ -81,6 +90,13 @@ def test_fake_adapters_satisfy_every_application_port(tmp_path: Path) -> None:
     clock: Clock = FakeClock([_timestamp()])
     cancellation: CancellationToken = FakeCancellationToken()
     progress: ProgressSink = FakeProgressSink()
+    dependency_report = DependencyReport(
+        tuple(
+            DependencyInfo(component, DependencyState.NOT_FOUND)
+            for component in DependencyComponent
+        )
+    )
+    dependency_probe: DependencyProbe = FakeDependencyProbe(dependency_report)
 
     source = _source_url()
     request = DownloadRequest(source, "Media", VideoPreset(), OutputPath(tmp_path))
@@ -89,15 +105,17 @@ def test_fake_adapters_satisfy_every_application_port(tmp_path: Path) -> None:
     assert downloader.download(job, progress=progress, cancellation=cancellation) == (
         DownloadOutcome.succeeded(artifact)
     )
-    assert (
-        processor.process(artifact, request, progress=progress, cancellation=cancellation) == output
-    )
+    processing_job = ProcessingJob(job.task_id, job.attempt_id, request, artifact)
+    assert processor.process(
+        processing_job, progress=progress, cancellation=cancellation
+    ) == ProcessingOutcome.succeeded(output)
     assert repository.list_downloads() == ()
     assert settings_store.load() == settings
     settings_store.save(settings)
     publisher.publish(AnalysisFailed(source, _failure(), _timestamp()))
     assert clock.now() == _timestamp()
     assert cancellation.is_cancelled() is False
+    assert dependency_probe.probe() == dependency_report
 
 
 def test_events_are_typed_immutable_and_contain_no_raw_contracts() -> None:
@@ -145,6 +163,14 @@ def test_application_models_reject_ambiguous_or_empty_values(tmp_path: Path) -> 
         DownloadOutcome()
     with pytest.raises(ValueError):
         DownloadOutcome(artifact=DownloadArtifact((path,), False), failure=_failure())
+    with pytest.raises(ValueError):
+        ProcessingOutcome()
+    with pytest.raises(ValueError):
+        DiskSpaceEstimate(-1, 1)
+    with pytest.raises(ValueError):
+        DependencyInfo(DependencyComponent.FFMPEG, DependencyState.READY)
+    with pytest.raises(ValueError):
+        DependencyReport((DependencyInfo(DependencyComponent.FFMPEG, DependencyState.NOT_FOUND),))
     with pytest.raises(ValueError):
         ApplicationSettings(OutputPath(tmp_path), concurrent_downloads=0)
 

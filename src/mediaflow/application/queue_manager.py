@@ -9,18 +9,27 @@ from time import monotonic
 
 from mediaflow.application.download_manager import DownloadManager
 from mediaflow.application.models import DownloadArtifact
-from mediaflow.domain import TaskId
+from mediaflow.application.processing_manager import ProcessingManager
+from mediaflow.domain import OutputPath, TaskId
 
 _LOGGER = logging.getLogger("mediaflow.queue")
+type _ExecutionResult = tuple[DownloadArtifact | None, OutputPath | None]
 
 
 class QueueManager:
     """Dispatch FIFO work to a bounded pool; no download runs on the caller thread."""
 
-    def __init__(self, download_manager: DownloadManager, *, concurrency: int) -> None:
+    def __init__(
+        self,
+        download_manager: DownloadManager,
+        *,
+        concurrency: int,
+        processing_manager: ProcessingManager | None = None,
+    ) -> None:
         if concurrency < 1:
             raise ValueError("Queue concurrency must be positive")
         self._download_manager = download_manager
+        self._processing_manager = processing_manager
         self._concurrency = concurrency
         self._executor = ThreadPoolExecutor(
             max_workers=concurrency, thread_name_prefix="mediaflow-download"
@@ -28,8 +37,9 @@ class QueueManager:
         self._lock = RLock()
         self._idle = Condition(self._lock)
         self._pending: deque[TaskId] = deque()
-        self._active: dict[TaskId, Future[DownloadArtifact | None]] = {}
+        self._active: dict[TaskId, Future[_ExecutionResult]] = {}
         self._artifacts: dict[TaskId, DownloadArtifact] = {}
+        self._outputs: dict[TaskId, OutputPath] = {}
         self._accepting = True
 
     @property
@@ -67,11 +77,20 @@ class QueueManager:
             else:
                 was_scheduled = task_id in self._active
         cancelled = self._download_manager.cancel(task_id)
-        return was_scheduled or cancelled
+        processing_cancelled = (
+            self._processing_manager.cancel(task_id)
+            if self._processing_manager is not None
+            else False
+        )
+        return was_scheduled or cancelled or processing_cancelled
 
     def take_artifact(self, task_id: TaskId) -> DownloadArtifact | None:
         with self._lock:
             return self._artifacts.pop(task_id, None)
+
+    def take_output(self, task_id: TaskId) -> OutputPath | None:
+        with self._lock:
+            return self._outputs.pop(task_id, None)
 
     def wait_for_idle(self, *, timeout_seconds: float) -> bool:
         if timeout_seconds < 0:
@@ -101,14 +120,21 @@ class QueueManager:
     def _dispatch_locked(self) -> None:
         while self._pending and len(self._active) < self._concurrency:
             task_id = self._pending.popleft()
-            future = self._executor.submit(self._download_manager.execute, task_id)
+            future = self._executor.submit(self._execute_task, task_id)
             self._active[task_id] = future
             future.add_done_callback(partial(self._completed, task_id))
 
-    def _completed(self, task_id: TaskId, future: Future[DownloadArtifact | None]) -> None:
+    def _execute_task(self, task_id: TaskId) -> _ExecutionResult:
+        artifact = self._download_manager.execute(task_id)
+        if artifact is None or self._processing_manager is None:
+            return artifact, None
+        return None, self._processing_manager.execute(task_id, artifact)
+
+    def _completed(self, task_id: TaskId, future: Future[_ExecutionResult]) -> None:
         artifact = None
+        output = None
         try:
-            artifact = future.result()
+            artifact, output = future.result()
         except Exception:
             _LOGGER.warning("application.failed")
         finally:
@@ -116,5 +142,7 @@ class QueueManager:
                 self._active.pop(task_id, None)
                 if artifact is not None:
                     self._artifacts[task_id] = artifact
+                if output is not None:
+                    self._outputs[task_id] = output
                 self._dispatch_locked()
                 self._idle.notify_all()
