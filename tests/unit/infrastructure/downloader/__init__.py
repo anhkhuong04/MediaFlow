@@ -1,0 +1,1 @@
+"""Downloader adapter unit tests."""

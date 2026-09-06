@@ -36,6 +36,26 @@ class AudioContainer(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class PlaylistSummary:
+    """Counts for a playlist container without leaking its raw entries."""
+
+    item_count: int | None
+    available_item_count: int | None
+
+    def __post_init__(self) -> None:
+        if self.item_count is not None and self.item_count < 0:
+            raise ValueError("Playlist item count cannot be negative")
+        if self.available_item_count is not None and self.available_item_count < 0:
+            raise ValueError("Available playlist item count cannot be negative")
+        if (
+            self.item_count is not None
+            and self.available_item_count is not None
+            and self.available_item_count > self.item_count
+        ):
+            raise ValueError("Available playlist items cannot exceed total items")
+
+
+@dataclass(frozen=True, slots=True)
 class MediaStream:
     """A normalized stream; ``key`` is opaque outside the downloader adapter."""
 
@@ -70,10 +90,15 @@ class MediaInfo:
     title: str
     source_name: str
     streams: tuple[MediaStream, ...]
+    canonical_url: SourceUrl | None = None
     uploader: str | None = None
     duration_seconds: float | None = None
     thumbnail_url: SourceUrl | None = None
     is_live: bool = False
+    has_subtitles: bool = False
+    has_automatic_captions: bool = False
+    chapter_count: int = 0
+    playlist: PlaylistSummary | None = None
 
     def __post_init__(self) -> None:
         if not self.title or not self.title.strip():
@@ -81,12 +106,14 @@ class MediaInfo:
         if not self.source_name or not self.source_name.strip():
             raise ValueError("Media source name must be non-empty")
         object.__setattr__(self, "streams", tuple(self.streams))
-        if not self.streams:
-            raise ValueError("Media info must contain at least one normalized stream")
+        if not self.streams and self.playlist is None:
+            raise ValueError("Single media info must contain at least one normalized stream")
         if self.uploader is not None and not self.uploader.strip():
             raise ValueError("Uploader must be non-empty when present")
         if self.duration_seconds is not None and self.duration_seconds < 0:
             raise ValueError("Duration cannot be negative")
+        if self.chapter_count < 0:
+            raise ValueError("Chapter count cannot be negative")
 
 
 @dataclass(frozen=True, slots=True)

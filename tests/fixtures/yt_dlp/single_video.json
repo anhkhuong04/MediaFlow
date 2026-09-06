@@ -1,0 +1,61 @@
+{
+  "id": "example-1",
+  "title": "Example video",
+  "extractor_key": "Example",
+  "webpage_url": "https://example.com/canonical/example-1",
+  "uploader": "Example channel",
+  "duration": 125.5,
+  "thumbnail": "https://cdn.example.com/example-1.jpg",
+  "is_live": false,
+  "subtitles": {"en": [{"ext": "vtt"}]},
+  "automatic_captions": {"vi": [{"ext": "vtt"}]},
+  "chapters": [{"title": "Intro"}, {"title": "Main"}],
+  "formats": [
+    {
+      "format_id": "v1080-30",
+      "ext": "webm",
+      "vcodec": "vp9",
+      "acodec": "none",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "vbr": 3200.0,
+      "filesize_approx": 51000000
+    },
+    {
+      "format_id": "v1080-60",
+      "ext": "webm",
+      "vcodec": "vp9",
+      "acodec": "none",
+      "width": 1920,
+      "height": 1080,
+      "fps": 60,
+      "vbr": 4800.0,
+      "filesize": 75000000
+    },
+    {
+      "format_id": "v720",
+      "ext": "mp4",
+      "vcodec": "avc1",
+      "acodec": "mp4a",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "tbr": 2200.0
+    },
+    {
+      "format_id": "a-high",
+      "ext": "m4a",
+      "vcodec": "none",
+      "acodec": "mp4a",
+      "abr": 160.0,
+      "filesize": 3100000
+    },
+    {
+      "format_id": "storyboard",
+      "ext": "mhtml",
+      "vcodec": "none",
+      "acodec": "none"
+    }
+  ]
+}

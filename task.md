@@ -1,10 +1,10 @@
 # MediaFlow — Kế hoạch triển khai Core
 
-> **Cập nhật:** 2026-09-06
+> **Cập nhật:** 2026-09-07
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C2 hoàn thành — tiếp theo C3 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C3 và C4 hoàn thành — tiếp theo C5 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -84,6 +84,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-005 | Adapter nhận/trả model chuẩn hóa, không phát tán raw yt-dlp dict hoặc stderr | Cô lập dependency thay đổi thường xuyên và giữ application API ổn định. |
 | D-006 | Pause chỉ xuất hiện sau khi semantics resume từ partial file được kiểm chứng | Không hứa một action mà backend không thực hiện đáng tin cậy. |
 | D-007 | Mọi task mutation dùng optimistic aggregate replacement; repository commit trước khi publish event | Repository luôn là nguồn state có thẩm quyền. Event delivery lỗi không rollback state; caller phải refresh trước khi thử lại command. |
+| D-008 | SQLite chỉ persist durable task facts và `updated_at` checkpoint; không persist progress snapshot, speed hoặc ETA | Giữ task/history phục hồi được nhưng tránh biến telemetry tần suất cao thành write amplification hoặc optimistic conflict giả. |
+| D-009 | Analyze cancellation là cooperative; `socket_timeout` giới hạn từng I/O, không phải hard deadline toàn operation | Phản ánh đúng giới hạn Python API của yt-dlp, không hứa khả năng cưỡng bức dừng mà adapter không bảo đảm. |
+| D-010 | Preset availability là application contract và phải hợp lệ trước enqueue; yt-dlp selector vẫn là infrastructure detail | UI nhận warning/choice typed, task không hợp lệ không lọt vào persistence, và provider format ID không vượt adapter boundary. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -190,13 +193,13 @@ Checkpoint đề xuất: `feat(core): add application contracts and use cases`
 
 Mục tiêu: lưu task truthfully, có khả năng migrate và phục hồi.
 
-- [ ] **C3.1** Thiết kế schema tối thiểu cho task, attempt, output và schema migration.
-- [ ] **C3.2** Viết migration runner có thứ tự, idempotent và transaction-safe.
-- [ ] **C3.3** Implement SQLite task repository theo application port; không trả database row ra ngoài adapter.
-- [ ] **C3.4** Persist durable state, request, error category/detail đã sanitize, output identity và timestamps.
-- [ ] **C3.5** Không persist telemetry tần suất cao như speed/ETA; xác định policy checkpoint progress nếu cần resume UI.
-- [ ] **C3.6** Implement history query từ persisted terminal tasks/attempts; chưa tạo bản sao history độc lập.
-- [ ] **C3.7** Viết migration/repository tests bằng temporary database, gồm rollback và reopen.
+- [x] **C3.1** Thiết kế schema tối thiểu cho task, attempt, output và schema migration.
+- [x] **C3.2** Viết migration runner có thứ tự, idempotent và transaction-safe.
+- [x] **C3.3** Implement SQLite task repository theo application port; không trả database row ra ngoài adapter.
+- [x] **C3.4** Persist durable state, request, error category/detail đã sanitize, output identity và timestamps.
+- [x] **C3.5** Không persist telemetry tần suất cao như speed/ETA; xác định policy checkpoint progress nếu cần resume UI.
+- [x] **C3.6** Implement history query từ persisted terminal tasks/attempts; chưa tạo bản sao history độc lập.
+- [x] **C3.7** Viết migration/repository tests bằng temporary database, gồm rollback và reopen.
 
 Acceptance criteria:
 
@@ -212,13 +215,13 @@ Checkpoint đề xuất: `feat(storage): persist tasks and attempts in SQLite`
 
 Mục tiêu: cô lập yt-dlp và trả metadata/preset dễ dùng cho application/UI.
 
-- [ ] **C4.1** Implement yt-dlp analyzer adapter bằng Python API với option tối thiểu và timeout/cancel boundary rõ ràng.
-- [ ] **C4.2** Normalize title, uploader, duration, thumbnail, source, streams, subtitles/chapters availability và playlist summary.
-- [ ] **C4.3** Xử lý field thiếu, duration/live/unknown size và metadata không đúng kiểu mà không làm crash.
-- [ ] **C4.4** Implement format selector cho `Best`, 2160p, 1440p, 1080p, 720p và Video/Audio presets.
-- [ ] **C4.5** Không silent fallback resolution; trả warning/choice rõ khi preset không tồn tại.
-- [ ] **C4.6** Map yt-dlp errors sang error taxonomy, giữ cause cho diagnostics và redact dữ liệu nhạy cảm.
-- [ ] **C4.7** Unit test bằng metadata fixtures; live URL smoke test để riêng và không chạy mặc định.
+- [x] **C4.1** Implement yt-dlp analyzer adapter bằng Python API với option tối thiểu và timeout/cancel boundary rõ ràng.
+- [x] **C4.2** Normalize title, uploader, duration, thumbnail, source, streams, subtitles/chapters availability và playlist summary.
+- [x] **C4.3** Xử lý field thiếu, duration/live/unknown size và metadata không đúng kiểu mà không làm crash.
+- [x] **C4.4** Implement format selector cho `Best`, 2160p, 1440p, 1080p, 720p và Video/Audio presets.
+- [x] **C4.5** Không silent fallback resolution; trả warning/choice rõ khi preset không tồn tại.
+- [x] **C4.6** Map yt-dlp errors sang error taxonomy, giữ cause cho diagnostics và redact dữ liệu nhạy cảm.
+- [x] **C4.7** Unit test bằng metadata fixtures; live URL smoke test để riêng và không chạy mặc định.
 
 Acceptance criteria:
 
@@ -394,6 +397,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C3 và C4 hoàn thành song song:** SQLite có schema normalized cho task/attempt/output, migration history liên tục có checksum và rollback từng version, repository optimistic theo durable projection, history là projection của terminal task, đồng thời mọi connection được đóng tường minh để không giữ file handle trên Windows. Analyzer yt-dlp dùng option tối thiểu, logger im lặng, cooperative cancellation và per-I/O socket timeout; metadata thiếu/sai kiểu/non-finite, playlist/subtitle/chapter/live được normalize sang model typed. Source URL giữ nguyên ý định người dùng, canonical URL tách riêng, credential-bearing URL bị chặn trước event/persistence. Format availability thuộc application, validate trước enqueue; selector hạ tầng không dùng raw format ID, không fallback resolution/video-only ngầm. Error taxonomy phân biệt unsupported, unavailable, auth, access và network; raw cause chỉ nằm trong diagnostic boundary. Toàn bộ Ruff, mypy strict, dependency checks và 206 offline tests chạy xanh; 1 live smoke test được deselect mặc định.
 - **2026-09-06 — C2 hoàn thành:** Tạo application API thuần Python gồm analyzer/downloader/media processor/task repository/settings/event/clock ports; typed analysis/task/progress/output/failure events; và các use case analyze, enqueue, cancel, retry, resume, downloads/history query. Analysis hỗ trợ cancellation token và chỉ trao đổi normalized outcome; task mutation dùng optimistic aggregate replacement, commit repository trước khi publish event. Fake adapters xác nhận luồng analyzer → queued task hoàn toàn offline, event không chứa raw dict/`Any` và application import không kéo framework/infrastructure. Toàn bộ Ruff, mypy strict, 128 offline tests và dependency checks chạy xanh trên Windows.
 - **2026-09-06 — C1 hoàn thành:** Tạo domain thuần Python với typed identifiers/boundary values, normalized media và preset models, immutable `DownloadRequest`, lifecycle riêng cho analysis, cùng state machine cho download task/attempt. Retry tạo attempt mới và chỉ cho phép failure retryable; progress dùng unit rõ ràng và giữ `None` cho giá trị chưa biết; failure dùng taxonomy/code an toàn thay vì raw exception. Ma trận 64 cặp transition và các invariant lifecycle được kiểm thử; toàn bộ 112 offline tests, Ruff, mypy strict, lock/dependency check đều chạy xanh trên Windows.
 - **2026-09-06 — C0 hoàn thành:** Chọn Python 3.13 x64; PySide6 6.11.2 và yt-dlp 2026.8.19 import thành công trên Python 3.13.2. Tạo package, pyproject, uv.lock, Windows CI và README. Logging UTF-8 JSON có rotation, allowlist event/context và fallback an toàn khi ghi thất bại. Hai môi trường sạch (editable và wheel không editable) đều đạt Ruff format/lint, mypy strict, 9 offline tests và dependency check. GitHub CI được cấu hình; kết quả chạy remote được theo dõi riêng, không suy ra từ local tests.

@@ -1,0 +1,13 @@
+{
+  "_type": "playlist",
+  "id": "playlist-1",
+  "title": "Example playlist",
+  "extractor_key": "ExamplePlaylist",
+  "webpage_url": "https://example.com/playlist/1",
+  "playlist_count": 4,
+  "entries": [
+    {"_type": "url", "id": "one", "title": "One"},
+    null,
+    {"_type": "url", "id": "three", "title": "Three"}
+  ]
+}

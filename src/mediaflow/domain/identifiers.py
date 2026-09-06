@@ -3,8 +3,27 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 from uuid import UUID, uuid4
+
+_SENSITIVE_QUERY_KEYS = {
+    "access_token",
+    "api_key",
+    "apikey",
+    "auth_token",
+    "authorization",
+    "cookie",
+    "credential",
+    "key-pair-id",
+    "password",
+    "passwd",
+    "refresh_token",
+    "sig",
+    "signature",
+    "token",
+}
+_SENSITIVE_FRAGMENT_KEYS = _SENSITIVE_QUERY_KEYS | {"code", "id_token"}
+_SIGNED_QUERY_PREFIXES = ("x-amz-", "x-goog-")
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +85,17 @@ class SourceUrl:
             raise ValueError("Source URL must be an absolute HTTP or HTTPS URL")
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("Source URL cannot contain embedded credentials")
+        query_keys = {key.casefold() for key, _ in parse_qsl(parsed.query, keep_blank_values=True)}
+        fragment_keys = {
+            key.casefold() for key, _ in parse_qsl(parsed.fragment, keep_blank_values=True)
+        }
+        has_signed_query = any(key.startswith(_SIGNED_QUERY_PREFIXES) for key in query_keys)
+        if (
+            query_keys & _SENSITIVE_QUERY_KEYS
+            or fragment_keys & _SENSITIVE_FRAGMENT_KEYS
+            or has_signed_query
+        ):
+            raise ValueError("Source URL cannot contain credential-bearing URL parameters")
 
     def __str__(self) -> str:
         return self.value

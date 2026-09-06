@@ -7,6 +7,7 @@ from mediaflow.domain import (
     AudioPreset,
     MediaInfo,
     MediaStream,
+    PlaylistSummary,
     SourceUrl,
     StreamKind,
     VideoContainer,
@@ -84,3 +85,23 @@ def test_media_info_requires_display_identity_and_a_stream() -> None:
             streams=(video_stream(),),
             duration_seconds=-1,
         )
+
+
+def test_playlist_container_can_have_no_fake_streams() -> None:
+    info = MediaInfo(
+        source_url=SourceUrl("https://example.com/playlist/1"),
+        title="Playlist",
+        source_name="Example",
+        streams=(),
+        playlist=PlaylistSummary(item_count=3, available_item_count=2),
+    )
+
+    assert info.streams == ()
+    assert info.playlist == PlaylistSummary(item_count=3, available_item_count=2)
+
+
+def test_playlist_summary_validates_counts() -> None:
+    with pytest.raises(ValueError):
+        PlaylistSummary(item_count=1, available_item_count=2)
+    with pytest.raises(ValueError):
+        PlaylistSummary(item_count=None, available_item_count=-1)

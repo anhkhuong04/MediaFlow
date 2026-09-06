@@ -44,6 +44,40 @@ def test_source_url_accepts_http_url_with_query_and_fragment() -> None:
     assert str(SourceUrl(value)) == value
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.com/media?token=secret",
+        "https://example.com/media?ACCESS_TOKEN=secret",
+        "https://example.com/media?api_key=secret",
+        "https://example.com/media?apikey=secret",
+        "https://example.com/media?credential=secret",
+        "https://example.com/media?Key-Pair-Id=secret",
+        "https://example.com/media?signature=secret",
+        "https://example.com/media?cookie=session",
+        "https://example.com/media?X-Amz-Credential=secret",
+        "https://example.com/media?X-Goog-Signature=secret",
+        "https://example.com/media#access_token=secret&token_type=bearer",
+        "https://example.com/media#code=oauth-secret",
+    ],
+)
+def test_source_url_rejects_credential_bearing_query_parameters(value: str) -> None:
+    with pytest.raises(ValueError, match="credential-bearing"):
+        SourceUrl(value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.com/watch?v=abc&list=playlist",
+        "https://example.com/watch?t=30&si=share-id",
+        "https://example.com/media#chapter=two",
+    ],
+)
+def test_source_url_allows_normal_media_parameters(value: str) -> None:
+    assert str(SourceUrl(value)) == value
+
+
 def test_output_path_requires_an_absolute_path(tmp_path: Path) -> None:
     assert str(OutputPath(tmp_path)) == str(tmp_path)
     with pytest.raises(ValueError):

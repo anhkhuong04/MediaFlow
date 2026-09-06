@@ -13,6 +13,7 @@ from mediaflow.application.events import (
     TaskQueued,
     TaskStateChanged,
 )
+from mediaflow.application.format_availability import require_preset_available
 from mediaflow.application.ports import (
     Analyzer,
     CancellationToken,
@@ -102,6 +103,7 @@ class EnqueueDownload:
     def execute(
         self, *, media: MediaInfo, preset: DownloadPreset, output_directory: OutputPath
     ) -> DownloadTask:
+        require_preset_available(media, preset)
         created_at = self.clock.now()
         request = DownloadRequest(
             source_url=media.source_url,

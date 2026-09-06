@@ -10,6 +10,13 @@ from mediaflow.application.events import (
     TaskQueued,
     TaskStateChanged,
 )
+from mediaflow.application.format_availability import (
+    PresetAvailability,
+    PresetAvailabilityIssue,
+    PresetUnavailable,
+    check_preset_availability,
+    require_preset_available,
+)
 from mediaflow.application.models import AnalysisOutcome, ApplicationSettings, DownloadArtifact
 from mediaflow.application.ports import (
     Analyzer,
@@ -53,6 +60,9 @@ __all__ = [
     "GetHistory",
     "MediaProcessor",
     "OutputReady",
+    "PresetAvailability",
+    "PresetAvailabilityIssue",
+    "PresetUnavailable",
     "ProgressSink",
     "ResumeDownload",
     "RetryDownload",
@@ -64,4 +74,6 @@ __all__ = [
     "TaskRepository",
     "TaskRepositoryConflict",
     "TaskStateChanged",
+    "check_preset_availability",
+    "require_preset_available",
 ]
