@@ -12,6 +12,9 @@ AGENTS.override.md
 *.pfx
 *.p12
 credentials.json
+cookies*.txt
+cookies*.json
+*.log.*
 secrets/
 
 # Python environments and caches
@@ -19,6 +22,9 @@ __pycache__/
 *.py[cod]
 *.pyd
 .venv/
+.venv-*/
+.[aA][gG][eE][nN][tT][sS]/
+[aA][gG][eE][nN][tT][sS].md
 venv/
 .pytest_cache/
 .ruff_cache/

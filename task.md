@@ -2,9 +2,9 @@
 
 > **Cập nhật:** 2026-09-06
 >
-> **Trạng thái tổng thể:** `PLANNED`
+> **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C0 — Engineering baseline`
+> **Giai đoạn hiện tại:** `C0 hoàn thành — tiếp theo C1 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -84,7 +84,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-005 | Adapter nhận/trả model chuẩn hóa, không phát tán raw yt-dlp dict hoặc stderr | Cô lập dependency thay đổi thường xuyên và giữ application API ổn định. |
 | D-006 | Pause chỉ xuất hiện sau khi semantics resume từ partial file được kiểm chứng | Không hứa một action mà backend không thực hiện đáng tin cậy. |
 
-Các quyết định về phiên bản Python, type checker và chiến lược phân phối FFmpeg được chốt trong C0/C6 sau khi kiểm tra compatibility thực tế.
+C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
+dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
+Chiến lược phân phối FFmpeg sẽ được chốt ở C6.
 
 ## 5. Thứ tự triển khai
 
@@ -118,13 +120,13 @@ C9 Core release gate
 
 Mục tiêu: có project Python tái lập được và quality gate tối thiểu trước khi viết domain.
 
-- [ ] **C0.1** Kiểm tra compatibility của Python, PySide6 và yt-dlp; chọn một Python baseline và ghi trong `pyproject.toml`.
-- [ ] **C0.2** Tạo `pyproject.toml` làm nguồn cấu hình duy nhất cho package, runtime dependencies và dev dependencies.
-- [ ] **C0.3** Tạo package tối thiểu `src/mediaflow` và test import; chưa tạo các module roadmap rỗng.
-- [ ] **C0.4** Cấu hình Ruff formatter/linter, một type checker và pytest với các lệnh chuẩn.
-- [ ] **C0.5** Tạo CI chạy format check, lint, type check và unit/integration tests không dùng mạng.
-- [ ] **C0.6** Tạo logging bootstrap an toàn: UTF-8, rotation hợp lý, không log secret, chưa phụ thuộc UI.
-- [ ] **C0.7** Viết README development ngắn: setup, test, lint/type-check và quy tắc smoke test.
+- [x] **C0.1** Kiểm tra compatibility của Python, PySide6 và yt-dlp; chọn một Python baseline và ghi trong `pyproject.toml`.
+- [x] **C0.2** Tạo `pyproject.toml` làm nguồn cấu hình duy nhất cho package, runtime dependencies và dev dependencies.
+- [x] **C0.3** Tạo package tối thiểu `src/mediaflow` và test import; chưa tạo các module roadmap rỗng.
+- [x] **C0.4** Cấu hình Ruff formatter/linter, một type checker và pytest với các lệnh chuẩn.
+- [x] **C0.5** Tạo CI chạy format check, lint, type check và unit/integration tests không dùng mạng.
+- [x] **C0.6** Tạo logging bootstrap an toàn: UTF-8, rotation hợp lý, không log secret, chưa phụ thuộc UI.
+- [x] **C0.7** Viết README development ngắn: setup, test, lint/type-check và quy tắc smoke test.
 
 Acceptance criteria:
 
@@ -391,4 +393,5 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-06 — C0 hoàn thành:** Chọn Python 3.13 x64; PySide6 6.11.2 và yt-dlp 2026.8.19 import thành công trên Python 3.13.2. Tạo package, pyproject, uv.lock, Windows CI và README. Logging UTF-8 JSON có rotation, allowlist event/context và fallback an toàn khi ghi thất bại. Hai môi trường sạch (editable và wheel không editable) đều đạt Ruff format/lint, mypy strict, 9 offline tests và dependency check. GitHub CI được cấu hình; kết quả chạy remote được theo dõi riêng, không suy ra từ local tests.
 - **2026-09-06:** Phân tích `docs/overview.md` và `docs/ui-ux.md`; lập roadmap Core V1 theo dependency, acceptance criteria, risk và checkpoint commit.
