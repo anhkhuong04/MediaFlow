@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C0 hoàn thành — tiếp theo C1 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C1 hoàn thành — tiếp theo C2 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -143,14 +143,14 @@ Checkpoint đề xuất: `chore: bootstrap Python project and quality gates`
 
 Mục tiêu: khóa vocabulary và invariant trước khi tích hợp engine.
 
-- [ ] **C1.1** Định nghĩa typed value objects cho task ID, attempt ID, URL nguồn, output path và timestamp UTC.
-- [ ] **C1.2** Định nghĩa `MediaInfo`, normalized format/stream, video/audio preset và immutable `DownloadRequest`.
-- [ ] **C1.3** Tách lifecycle của `AnalysisOperation` khỏi lifecycle của `DownloadTask`.
-- [ ] **C1.4** Định nghĩa task states tối thiểu: `QUEUED`, `DOWNLOADING`, `PROCESSING`, `PAUSED`, `INTERRUPTED`, `COMPLETED`, `FAILED`, `CANCELLED`.
-- [ ] **C1.5** Viết transition table và guard; terminal attempt không được tự quay lại active state.
-- [ ] **C1.6** Định nghĩa `ProgressSnapshot` với unit/optionality rõ ràng; unknown không được biểu diễn bằng số giả.
-- [ ] **C1.7** Định nghĩa error taxonomy: input, unsupported source, unavailable, auth required, access denied, network, disk, dependency, conflict, download, processing, cancelled, unexpected.
-- [ ] **C1.8** Viết unit tests cho mọi transition hợp lệ/không hợp lệ và invariant `Completed`.
+- [x] **C1.1** Định nghĩa typed value objects cho task ID, attempt ID, URL nguồn, output path và timestamp UTC.
+- [x] **C1.2** Định nghĩa `MediaInfo`, normalized format/stream, video/audio preset và immutable `DownloadRequest`.
+- [x] **C1.3** Tách lifecycle của `AnalysisOperation` khỏi lifecycle của `DownloadTask`.
+- [x] **C1.4** Định nghĩa task states tối thiểu: `QUEUED`, `DOWNLOADING`, `PROCESSING`, `PAUSED`, `INTERRUPTED`, `COMPLETED`, `FAILED`, `CANCELLED`.
+- [x] **C1.5** Viết transition table và guard; terminal attempt không được tự quay lại active state.
+- [x] **C1.6** Định nghĩa `ProgressSnapshot` với unit/optionality rõ ràng; unknown không được biểu diễn bằng số giả.
+- [x] **C1.7** Định nghĩa error taxonomy: input, unsupported source, unavailable, auth required, access denied, network, disk, dependency, conflict, download, processing, cancelled, unexpected.
+- [x] **C1.8** Viết unit tests cho mọi transition hợp lệ/không hợp lệ và invariant `Completed`.
 
 Acceptance criteria:
 
@@ -393,5 +393,6 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-06 — C1 hoàn thành:** Tạo domain thuần Python với typed identifiers/boundary values, normalized media và preset models, immutable `DownloadRequest`, lifecycle riêng cho analysis, cùng state machine cho download task/attempt. Retry tạo attempt mới và chỉ cho phép failure retryable; progress dùng unit rõ ràng và giữ `None` cho giá trị chưa biết; failure dùng taxonomy/code an toàn thay vì raw exception. Ma trận 64 cặp transition và các invariant lifecycle được kiểm thử; toàn bộ 112 offline tests, Ruff, mypy strict, lock/dependency check đều chạy xanh trên Windows.
 - **2026-09-06 — C0 hoàn thành:** Chọn Python 3.13 x64; PySide6 6.11.2 và yt-dlp 2026.8.19 import thành công trên Python 3.13.2. Tạo package, pyproject, uv.lock, Windows CI và README. Logging UTF-8 JSON có rotation, allowlist event/context và fallback an toàn khi ghi thất bại. Hai môi trường sạch (editable và wheel không editable) đều đạt Ruff format/lint, mypy strict, 9 offline tests và dependency check. GitHub CI được cấu hình; kết quả chạy remote được theo dõi riêng, không suy ra từ local tests.
 - **2026-09-06:** Phân tích `docs/overview.md` và `docs/ui-ux.md`; lập roadmap Core V1 theo dependency, acceptance criteria, risk và checkpoint commit.
