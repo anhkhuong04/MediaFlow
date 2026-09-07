@@ -3,7 +3,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QFrame, QScrollArea
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QScrollArea
 
 from mediaflow.presentation import (
     MediaFlowWindow,
@@ -88,6 +88,32 @@ def test_compact_shell_switches_navigation_to_accessible_icon_only(qtbot: object
     window.resize(1200, 700)
     assert window.shell_width.value == ShellWidth.LARGE.value
     assert home.toolButtonStyle() is Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+
+
+def test_sidebar_uses_packaged_brand_and_navigation_artwork(qtbot: object) -> None:
+    window = MediaFlowWindow()
+    _add_widget(qtbot, window)
+    window.show()
+
+    tagline = window.findChild(QLabel, "applicationTagline")
+    footer_tagline = window.findChild(QLabel, "footerTagline")
+    brand_mark = window.findChild(QLabel, "brandMark")
+    footer_mark = window.findChild(QLabel, "footerMark")
+
+    assert tagline is not None and tagline.text() == "Download. Keep. Enjoy."
+    assert footer_tagline is not None and "simpler way" in footer_tagline.text()
+    assert brand_mark is not None and brand_mark.pixmap() is not None
+    assert footer_mark is not None and footer_mark.pixmap() is not None
+    assert all(
+        not window.navigation_button(destination).icon().isNull()
+        for destination in NavigationDestination
+    )
+
+    window.resize(800, 600)
+
+    assert not tagline.isVisible()
+    assert not footer_tagline.isVisible()
+    assert brand_mark.isVisible()
 
 
 def test_geometry_is_clamped_and_persisted_in_the_injected_store(

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence, QResizeEvent
+from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QIcon, QKeySequence, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -23,6 +23,8 @@ from mediaflow.presentation.design import TOKENS, ShellWidth, ThemeController, T
 from mediaflow.presentation.shell import (
     NavigationDestination,
     PlaceholderPage,
+    brand_icon,
+    footer_brand_icon,
     make_navigation_button,
 )
 from mediaflow.presentation.strings import Localizer, StringKey
@@ -210,10 +212,32 @@ class MediaFlowWindow(QMainWindow):
             TOKENS.spacing.standard,
         )
         sidebar_layout.setSpacing(TOKENS.spacing.small)
-        self._application_name = QLabel(self._localizer.text(StringKey.APP_NAME), self._sidebar)
+        self._brand_header = QWidget(self._sidebar)
+        self._brand_header.setObjectName("brandHeader")
+        brand_layout = QHBoxLayout(self._brand_header)
+        brand_layout.setContentsMargins(0, 0, 0, 0)
+        brand_layout.setSpacing(TOKENS.spacing.compact)
+        self._brand_mark = QLabel(self._brand_header)
+        self._brand_mark.setObjectName("brandMark")
+        self._brand_mark.setPixmap(brand_icon().pixmap(44, 44, QIcon.Mode.Normal, QIcon.State.Off))
+        self._brand_mark.setFixedSize(44, 44)
+        self._brand_mark.setAccessibleName(self._localizer.text(StringKey.APP_NAME))
+        brand_layout.addWidget(self._brand_mark)
+        self._brand_copy = QWidget(self._brand_header)
+        brand_copy_layout = QVBoxLayout(self._brand_copy)
+        brand_copy_layout.setContentsMargins(0, 0, 0, 0)
+        brand_copy_layout.setSpacing(0)
+        self._application_name = QLabel(self._localizer.text(StringKey.APP_NAME), self._brand_copy)
         self._application_name.setObjectName("applicationName")
-        sidebar_layout.addWidget(self._application_name)
-        sidebar_layout.addSpacing(TOKENS.spacing.standard)
+        self._application_tagline = QLabel(
+            self._localizer.text(StringKey.APP_TAGLINE), self._brand_copy
+        )
+        self._application_tagline.setObjectName("applicationTagline")
+        brand_copy_layout.addWidget(self._application_name)
+        brand_copy_layout.addWidget(self._application_tagline)
+        brand_layout.addWidget(self._brand_copy, 1)
+        sidebar_layout.addWidget(self._brand_header)
+        sidebar_layout.addSpacing(TOKENS.spacing.section)
 
         self._content_stack = QStackedWidget(root)
         self._content_stack.setObjectName("contentArea")
@@ -243,11 +267,39 @@ class MediaFlowWindow(QMainWindow):
             sidebar_layout.addWidget(button)
 
         sidebar_layout.addStretch(1)
-        status = QLabel(self._localizer.text(StringKey.SHELL_STATUS_READY), self._sidebar)
-        status.setObjectName("shellStatus")
-        status.setWordWrap(True)
-        status.setAccessibleName(self._localizer.text(StringKey.SHELL_STATUS_READY))
-        sidebar_layout.addWidget(status)
+        self._brand_footer = QWidget(self._sidebar)
+        self._brand_footer.setObjectName("brandFooter")
+        footer_layout = QVBoxLayout(self._brand_footer)
+        footer_layout.setContentsMargins(TOKENS.spacing.compact, 0, 0, 0)
+        footer_layout.setSpacing(TOKENS.spacing.small)
+        footer_identity = QWidget(self._brand_footer)
+        identity_layout = QHBoxLayout(footer_identity)
+        identity_layout.setContentsMargins(0, 0, 0, 0)
+        identity_layout.setSpacing(TOKENS.spacing.small)
+        self._footer_mark = QLabel(footer_identity)
+        self._footer_mark.setObjectName("footerMark")
+        self._footer_mark.setPixmap(footer_brand_icon().pixmap(24, 24))
+        self._footer_mark.setFixedSize(24, 24)
+        identity_layout.addWidget(self._footer_mark)
+        identity_copy = QWidget(footer_identity)
+        identity_copy_layout = QVBoxLayout(identity_copy)
+        identity_copy_layout.setContentsMargins(0, 0, 0, 0)
+        identity_copy_layout.setSpacing(0)
+        footer_name = QLabel(self._localizer.text(StringKey.APP_NAME), identity_copy)
+        footer_name.setObjectName("footerName")
+        footer_version = QLabel(self._localizer.text(StringKey.APP_VERSION), identity_copy)
+        footer_version.setObjectName("footerVersion")
+        identity_copy_layout.addWidget(footer_name)
+        identity_copy_layout.addWidget(footer_version)
+        identity_layout.addWidget(identity_copy, 1)
+        footer_layout.addWidget(footer_identity)
+        self._footer_tagline = QLabel(
+            self._localizer.text(StringKey.APP_FOOTER_TAGLINE), self._brand_footer
+        )
+        self._footer_tagline.setObjectName("footerTagline")
+        self._footer_tagline.setWordWrap(True)
+        footer_layout.addWidget(self._footer_tagline)
+        sidebar_layout.addWidget(self._brand_footer)
 
         root_layout.addWidget(self._sidebar)
         root_layout.addWidget(self._content_stack, 1)
@@ -286,7 +338,8 @@ class MediaFlowWindow(QMainWindow):
         compact = shell_width is ShellWidth.COMPACT
         sidebar_width = self._COMPACT_SIDEBAR_WIDTH if compact else self._FULL_SIDEBAR_WIDTH
         self._sidebar.setFixedWidth(sidebar_width)
-        self._application_name.setVisible(not compact)
+        self._brand_copy.setVisible(not compact)
+        self._brand_footer.setVisible(not compact)
         for button in self._navigation_buttons.values():
             button.setToolButtonStyle(
                 Qt.ToolButtonStyle.ToolButtonIconOnly

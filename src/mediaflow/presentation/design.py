@@ -226,17 +226,28 @@ def build_stylesheet(palette: PaletteTokens) -> str:
             background: {palette.window};
         }}
         QFrame#sidebar {{
-            background: {palette.surface};
+            background: qlineargradient(
+                x1: 0, y1: 0, x2: 1, y2: 1,
+                stop: 0 {palette.surface}, stop: 1 {palette.window}
+            );
             border-right: 1px solid {palette.border};
         }}
+        QWidget#brandHeader {{ padding: {spacing.small}px {spacing.compact}px; }}
         QLabel#applicationName {{
             color: {palette.text};
             font-size: {typography.section_title}pt;
-            font-weight: 600;
+            font-weight: 700;
         }}
+        QLabel#applicationTagline, QLabel#footerName, QLabel#footerVersion, QLabel#footerTagline {{
+            color: {palette.text_secondary};
+            font-size: {typography.secondary}pt;
+        }}
+        QLabel#footerName {{ color: {palette.text}; font-weight: 600; }}
+        QLabel#footerTagline {{ padding-top: {spacing.small}px; }}
         QToolButton#navigationItem {{
             background: transparent;
             border: 1px solid transparent;
+            border-left: 3px solid transparent;
             border-radius: {radius.control}px;
             color: {palette.text};
             font-size: {typography.body}pt;
@@ -248,6 +259,7 @@ def build_stylesheet(palette: PaletteTokens) -> str:
         }}
         QToolButton#navigationItem:checked {{
             background: {palette.accent};
+            border-left-color: {palette.focus_ring};
             color: {palette.accent_text};
             font-weight: 600;
         }}

@@ -14,6 +14,9 @@ class StringKey(StrEnum):
     """Stable keys that widgets use instead of scattering visible copy."""
 
     APP_NAME = "app.name"
+    APP_TAGLINE = "app.tagline"
+    APP_VERSION = "app.version"
+    APP_FOOTER_TAGLINE = "app.footer_tagline"
     HOME = "navigation.home"
     DOWNLOADS = "navigation.downloads"
     HISTORY = "navigation.history"
@@ -159,6 +162,9 @@ class StringKey(StrEnum):
 
 _ENGLISH: dict[StringKey, str] = {
     StringKey.APP_NAME: "MediaFlow",
+    StringKey.APP_TAGLINE: "Download. Keep. Enjoy.",
+    StringKey.APP_VERSION: "v1.0.0",
+    StringKey.APP_FOOTER_TAGLINE: "A simpler way to save the videos you love.",
     StringKey.HOME: "Home",
     StringKey.DOWNLOADS: "Downloads",
     StringKey.HISTORY: "History",
@@ -340,6 +346,9 @@ _VIETNAMESE: dict[StringKey, str] = {
 # Keep the Vietnamese catalog complete instead of depending on English fallback for V1 flows.
 _VIETNAMESE.update(
     {
+        StringKey.APP_TAGLINE: "Tải về. Lưu giữ. Tận hưởng.",
+        StringKey.APP_VERSION: "v1.0.0",
+        StringKey.APP_FOOTER_TAGLINE: "Cách đơn giản hơn để lưu những video bạn yêu thích.",
         StringKey.HOME_URL_LABEL: "URL media",
         StringKey.HOME_URL_PLACEHOLDER: "Dán URL video, audio hoặc playlist",
         StringKey.ADVANCED_OPTIONS: "Tùy chọn nâng cao",
