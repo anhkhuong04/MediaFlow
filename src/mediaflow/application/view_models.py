@@ -45,6 +45,7 @@ class PresetOptionView:
     frames_per_second: int | None
     available: bool
     unavailable_reason_key: str | None = None
+    requires_processing: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -355,6 +356,7 @@ def _preset_views(media: MediaInfo) -> tuple[PresetOptionView, ...]:
                     if availability.issue is not None
                     else None
                 ),
+                requires_processing=isinstance(preset, AudioPreset),
             )
         )
     return tuple(views)

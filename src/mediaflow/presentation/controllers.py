@@ -11,6 +11,7 @@ from mediaflow.application import (
     ApplicationEvent,
     CommandResult,
     DownloadItemView,
+    DownloadSummaryView,
     DownloadsView,
     HistoryItemView,
     MediaConfigurationView,
@@ -59,6 +60,7 @@ class DownloadsState:
     selected_task_id: str | None = None
     refresh: CommandState = CommandState()
     action_states: tuple[TaskActionState, ...] = ()
+    summary: DownloadSummaryView = DownloadSummaryView(0, 0, 0, 0)
 
 
 class TaskAction(StrEnum):
@@ -130,7 +132,6 @@ class HomeController(QObject):
         self._state = replace(
             self._state,
             analysis=CommandState(is_busy=True),
-            configuration=None,
             active_analysis_request_id=request.request_id,
         )
         self.state_changed.emit(self._state)
@@ -311,6 +312,7 @@ class DownloadsController(QObject):
             self._state,
             items=view.items,
             selected_task_id=selected_task_id,
+            summary=view.summary,
         )
 
     def _upsert(self, item: DownloadItemView, *, emit: bool = True) -> None:

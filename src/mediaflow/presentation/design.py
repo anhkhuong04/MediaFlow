@@ -253,4 +253,32 @@ def build_stylesheet(palette: PaletteTokens) -> str:
             padding-top: {spacing.standard}px;
         }}
         QLabel:disabled {{ color: {palette.disabled_text}; }}
+        QScrollArea#screenScroll {{ border: none; background: transparent; }}
+        QFrame#screenCard, QFrame#downloadCard {{
+            background: {palette.surface};
+            border: 1px solid {palette.border};
+            border-radius: {radius.card}px;
+        }}
+        QLabel#secondaryText, QLabel#helperText {{ color: {palette.text_secondary}; }}
+        QLabel#errorText {{ color: {palette.error}; }}
+        QPushButton {{
+            border: 1px solid {palette.border};
+            border-radius: {radius.control}px;
+            background: {palette.surface};
+            color: {palette.text};
+            padding: {spacing.small}px {spacing.compact}px;
+        }}
+        QPushButton:hover {{ background: {palette.surface_raised}; }}
+        QPushButton#primaryAction {{
+            background: {palette.accent}; color: {palette.accent_text};
+            border-color: {palette.accent}; font-weight: 600;
+        }}
+        QLineEdit, QComboBox {{
+            background: {palette.surface}; color: {palette.text};
+            border: 1px solid {palette.border}; border-radius: {radius.control}px;
+            padding: {spacing.small}px;
+        }}
+        QLineEdit:focus, QComboBox:focus, QPushButton:focus, QToolButton:focus {{
+            border: 2px solid {palette.focus_ring};
+        }}
     """

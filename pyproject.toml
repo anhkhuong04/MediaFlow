@@ -39,5 +39,6 @@ files = ["src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--strict-config --strict-markers --disable-socket -m 'not smoke'"
 markers = ["smoke: opt-in checks using external network or executables"]

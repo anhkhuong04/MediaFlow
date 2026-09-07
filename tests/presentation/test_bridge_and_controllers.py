@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event, Thread
 
-from PySide6.QtCore import QThread
+from PySide6.QtCore import Qt, QThread
+from PySide6.QtWidgets import QWidget
 
 from mediaflow.application import (
     AnalysisFailed,
@@ -22,6 +23,7 @@ from mediaflow.application import (
     InProcessEventBus,
     MediaConfigurationView,
     MediaKind,
+    PresetOptionView,
     ProgressView,
     SettingsView,
     TaskActionsView,
@@ -43,6 +45,7 @@ from mediaflow.domain import (
 from mediaflow.presentation.bridge import PresentationCommandRunner, QtEventBridge
 from mediaflow.presentation.controllers import DownloadsController, HomeController, TaskAction
 from mediaflow.presentation.coordinator import PresentationCoordinator
+from mediaflow.presentation.home import HomePage
 from mediaflow.presentation.window import MediaFlowWindow
 
 
@@ -210,6 +213,43 @@ def test_analyze_and_task_action_reject_duplicate_intent_until_completion(qtbot:
     runner.close()
 
 
+def test_home_page_keeps_url_explicit_and_exposes_only_normalized_preset_choices(
+    qtbot: object,
+) -> None:
+    facade = FakePresentationFacade()
+    bridge = QtEventBridge(facade)
+    runner = PresentationCommandRunner(bridge)
+    home = HomeController(facade, bridge, runner)
+    page = HomePage(home)
+    bridge.command_completed.connect(home.handle_completion)
+    bridge.start()
+    _add_widget(qtbot, page)
+    page.show()
+
+    page.url_input.setText("https://example.com/media")
+    assert not home.state.analysis.is_busy
+    page.analyze_button.click()
+    assert home.state.analysis.is_busy
+    assert page.cancel_button.isVisible()
+    assert page.configuration_card.isHidden()
+
+    facade.analysis_result.set_result(CommandResult.succeeded(_configuration_with_presets()))
+    _wait_until(qtbot, lambda: home.state.configuration is not None)
+    assert page.url_input.text() == "https://example.com/media"
+    assert page.configuration_card.isVisible()
+    assert page.preset_combo.currentData(Qt.ItemDataRole.UserRole) == "video.1080p.mp4.auto"
+    assert not page.add_button.isEnabled()
+
+    page.set_default_output_directory("C:\\Downloads")
+    assert page.add_button.isEnabled()
+    page.audio_button.click()
+    assert page.conversion_notice.isVisible()
+    assert page.preset_combo.currentData(Qt.ItemDataRole.UserRole) == "audio.best.mp3.auto"
+
+    bridge.close()
+    runner.close()
+
+
 def test_presentation_layer_does_not_depend_on_infrastructure_modules() -> None:
     presentation_root = Path(__file__).parents[2] / "src" / "mediaflow" / "presentation"
 
@@ -333,6 +373,32 @@ def _configuration() -> MediaConfigurationView:
     )
 
 
+def _configuration_with_presets() -> MediaConfigurationView:
+    return MediaConfigurationView(
+        configuration_id="configuration-id",
+        source_url="https://example.com/media",
+        title="A deliberately long media title that remains readable in the compact card",
+        source_name="Example",
+        uploader=None,
+        duration_seconds=None,
+        thumbnail_url=None,
+        is_live=False,
+        playlist_item_count=None,
+        presets=(
+            PresetOptionView("video.1080p.mp4.auto", MediaKind.VIDEO, "1080p", "mp4", None, True),
+            PresetOptionView(
+                "audio.best.mp3.auto",
+                MediaKind.AUDIO,
+                "best",
+                "mp3",
+                None,
+                True,
+                requires_processing=True,
+            ),
+        ),
+    )
+
+
 def _progress_event(
     task_id: TaskId, attempt_id: AttemptId, downloaded: int, total: int, seconds: int
 ) -> TaskProgressChanged:
@@ -364,7 +430,7 @@ def _wait(qtbot: object, milliseconds: int) -> None:
     wait(milliseconds)
 
 
-def _add_widget(qtbot: object, widget: MediaFlowWindow) -> None:
+def _add_widget(qtbot: object, widget: QWidget) -> None:
     add_widget = getattr(qtbot, "addWidget", None)
     if add_widget is None:
         raise AssertionError("pytest-qt did not provide qtbot.addWidget")

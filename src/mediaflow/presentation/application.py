@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QApplication
 from mediaflow.application import ShutdownReport
 from mediaflow.bootstrap import BootstrapConfig, MediaFlowRuntime, build_runtime
 from mediaflow.presentation.coordinator import PresentationCoordinator
+from mediaflow.presentation.home import HomePage
+from mediaflow.presentation.shell import NavigationDestination
 from mediaflow.presentation.window import MediaFlowWindow
 
 
@@ -59,6 +61,16 @@ def build_desktop_runtime(
     core_runtime = build_runtime(config)
     window = MediaFlowWindow(geometry_store=geometry_store)
     presentation = PresentationCoordinator(core_runtime.facade)
+    home = HomePage(presentation.home)
+    window.replace_page(NavigationDestination.HOME, home)
+    home.queued.connect(lambda: window.navigate(NavigationDestination.DOWNLOADS))
+    presentation.settings.state_changed.connect(
+        lambda state: (
+            home.set_default_output_directory(state.settings.default_output_directory)
+            if state.settings is not None
+            else None
+        )
+    )
     window.closed.connect(presentation.close)
     presentation.start()
     return DesktopRuntime(

@@ -117,6 +117,21 @@ class MediaFlowWindow(QMainWindow):
         self._content_stack.setCurrentWidget(self._pages[destination])
         self._navigation_buttons[destination].setChecked(True)
 
+    def replace_page(self, destination: NavigationDestination, page: QWidget) -> None:
+        """Replace one milestone placeholder while retaining shell navigation state."""
+
+        assert_ui_thread(self)
+        current = self._pages[destination]
+        if current is page:
+            return
+        index = self._content_stack.indexOf(current)
+        self._content_stack.removeWidget(current)
+        current.deleteLater()
+        self._content_stack.insertWidget(index, page)
+        self._pages[destination] = page
+        if self._current_destination is destination:
+            self._content_stack.setCurrentWidget(page)
+
     def go_home(self) -> None:
         """Implement the global back-to-Home intent used by shell shortcuts."""
 
