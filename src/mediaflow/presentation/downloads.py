@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QFocusEvent
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFocusEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -18,9 +16,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from mediaflow.application import DownloadItemView, DownloadStatus, ProgressView
+from mediaflow.application import DownloadItemView, DownloadStatus, ProgressView, TaskDetailsView
 from mediaflow.presentation.controllers import DownloadsController, DownloadsState, TaskAction
 from mediaflow.presentation.design import TOKENS
+from mediaflow.presentation.diagnostics import ErrorDetailsDialog, details_for_task
+from mediaflow.presentation.output_actions import OutputLauncher, QtOutputLauncher
 from mediaflow.presentation.strings import Localizer, StringKey
 from mediaflow.presentation.window import assert_ui_thread
 
@@ -29,12 +29,19 @@ class DownloadsPage(QScrollArea):
     """Render authoritative downloads incrementally, keyed by stable task ID."""
 
     def __init__(
-        self, controller: DownloadsController, *, localizer: Localizer | None = None
+        self,
+        controller: DownloadsController,
+        *,
+        localizer: Localizer | None = None,
+        output_launcher: OutputLauncher | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
         self._localizer = localizer or Localizer()
+        self._output_launcher = output_launcher or QtOutputLauncher()
         self._cards: dict[str, DownloadCard] = {}
+        self._pending_details: set[str] = set()
+        self._detail_dialogs: dict[str, ErrorDetailsDialog] = {}
         self.setObjectName("screenScroll")
         self.setWidgetResizable(True)
         content = QWidget(self)
@@ -83,8 +90,11 @@ class DownloadsPage(QScrollArea):
             items_by_section[_section_for(item)].append(item)
             card = self._cards.get(item.task_id)
             if card is None:
-                card = DownloadCard(item, self._controller, self._localizer, self)
+                card = DownloadCard(
+                    item, self._controller, self._localizer, self._output_launcher, self
+                )
                 card.focused.connect(self._controller.select_task)
+                card.details_requested.connect(self._show_details)
                 self._cards[item.task_id] = card
             else:
                 card.update_item(item)
@@ -105,6 +115,35 @@ class DownloadsPage(QScrollArea):
             f"{summary.completed} {self._text(StringKey.STATUS_COMPLETED).lower()} · "
             f"{summary.failed} {self._text(StringKey.STATUS_FAILED).lower()}"
         )
+
+        details_by_id = {detail.item.task_id: detail for detail in state.details}
+        for task_id in tuple(self._pending_details):
+            detail = details_by_id.get(task_id)
+            if detail is not None:
+                self._pending_details.remove(task_id)
+                self._present_details(detail)
+
+    def _show_details(self, task_id: str) -> None:
+        detail = self._controller.details_for(task_id)
+        if detail is not None:
+            self._present_details(detail)
+            return
+        self._pending_details.add(task_id)
+        self._controller.load_details(task_id)
+
+    def _present_details(self, detail: TaskDetailsView) -> None:
+        task_id = detail.item.task_id
+        existing = self._detail_dialogs.get(task_id)
+        if existing is not None:
+            existing.raise_()
+            existing.activateWindow()
+            return
+        dialog = ErrorDetailsDialog(details_for_task(detail), self._localizer, self)
+        dialog.finished.connect(
+            lambda _result, selected=task_id: self._detail_dialogs.pop(selected, None)
+        )
+        self._detail_dialogs[task_id] = dialog
+        dialog.open()
 
     def _text(self, key: StringKey) -> str:
         return self._localizer.text(key)
@@ -144,18 +183,21 @@ class DownloadCard(QFrame):
     """One card whose update path never depends on a mutable row index."""
 
     focused = Signal(str)
+    details_requested = Signal(str)
 
     def __init__(
         self,
         item: DownloadItemView,
         controller: DownloadsController,
         localizer: Localizer,
+        output_launcher: OutputLauncher,
         parent: QWidget,
     ) -> None:
         super().__init__(parent)
         self._item = item
         self._controller = controller
         self._localizer = localizer
+        self._output_launcher = output_launcher
         self.setObjectName("downloadCard")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         layout = QVBoxLayout(self)
@@ -209,7 +251,7 @@ class DownloadCard(QFrame):
         self.open_folder.clicked.connect(self._open_folder)
         self.actions_layout.addWidget(self.open_folder)
         self.details_button = QPushButton(self._text(StringKey.DETAILS), self)
-        self.details_button.clicked.connect(self._show_details)
+        self.details_button.clicked.connect(lambda: self.details_requested.emit(self._item.task_id))
         self.actions_layout.addWidget(self.details_button)
         self.actions_layout.addStretch(1)
         self.update_item(item)
@@ -290,18 +332,15 @@ class DownloadCard(QFrame):
 
     def _open_file(self) -> None:
         if self._item.actions.can_open_output and self._item.output_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._item.output_path))
+            self._output_launcher.open_file(
+                self._item.output_path, allowed=self._item.actions.can_open_output
+            )
 
     def _open_folder(self) -> None:
         if self._item.actions.can_open_output and self._item.output_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self._item.output_path).parent)))
-
-    def _show_details(self) -> None:
-        QMessageBox.information(
-            self,
-            self._text(StringKey.DETAILS),
-            f"{self._text(StringKey.ERROR_GENERIC_TITLE)}\n{self._text(StringKey.ERROR_GENERIC_BODY)}",
-        )
+            self._output_launcher.open_folder(
+                self._item.output_path, allowed=self._item.actions.can_open_output
+            )
 
     def _action_busy(self, action: TaskAction) -> bool:
         return any(

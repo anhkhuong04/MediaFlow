@@ -64,6 +64,7 @@ class DownloadsState:
     refresh: CommandState = CommandState()
     action_states: tuple[TaskActionState, ...] = ()
     summary: DownloadSummaryView = DownloadSummaryView(0, 0, 0, 0)
+    details: tuple[TaskDetailsView, ...] = ()
 
 
 class TaskAction(StrEnum):
@@ -211,6 +212,7 @@ class DownloadsController(QObject):
         self._task_revisions: dict[str, int] = {}
         self._inflight_revisions: dict[str, int] = {}
         self._action_states: dict[CommandKey, CommandState] = {}
+        self._details_by_task_id: dict[str, TaskDetailsView] = {}
 
     @property
     def state(self) -> DownloadsState:
@@ -238,6 +240,18 @@ class DownloadsController(QObject):
         if selected != self._state.selected_task_id:
             self._state = replace(self._state, selected_task_id=selected)
             self.state_changed.emit(self._state)
+
+    def details_for(self, task_id: str) -> TaskDetailsView | None:
+        """Return a previously loaded details projection without another raw-data access."""
+
+        return self._details_by_task_id.get(task_id)
+
+    def load_details(self, task_id: str) -> bool:
+        """Load an error-details projection in the presentation worker."""
+
+        assert_ui_thread(self)
+        key = CommandKey("downloads", "details", task_id)
+        return self._runner.submit(key, lambda: self._facade.task_details(task_id))
 
     def handle_event(self, event: ApplicationEvent) -> None:
         """Request a targeted authoritative row refresh for one task only."""
@@ -289,6 +303,13 @@ class DownloadsController(QObject):
             if isinstance(completion.result.value, DownloadItemView):
                 self._upsert(completion.result.value, emit=False)
             self._emit_state()
+            return
+        if completion.key.action == "details" and completion.key.subject_id is not None:
+            self._runner.release(completion.key)
+            if isinstance(completion.result.value, TaskDetailsView):
+                self._details_by_task_id[completion.key.subject_id] = completion.result.value
+                self._state = replace(self._state, details=tuple(self._details_by_task_id.values()))
+            self.state_changed.emit(self._state)
             return
         if completion.key.action != "task_refresh":
             return

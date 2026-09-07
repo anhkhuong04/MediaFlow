@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -23,6 +20,7 @@ from mediaflow.application import HistoryItemView, TaskDetailsView
 from mediaflow.presentation.controllers import HistoryController, HistoryState
 from mediaflow.presentation.design import TOKENS
 from mediaflow.presentation.downloads import _status_text
+from mediaflow.presentation.output_actions import OutputLauncher, QtOutputLauncher
 from mediaflow.presentation.strings import Localizer, StringKey
 from mediaflow.presentation.window import assert_ui_thread
 
@@ -33,11 +31,16 @@ class HistoryPage(QScrollArea):
     download_again_requested = Signal(str)
 
     def __init__(
-        self, controller: HistoryController, *, localizer: Localizer | None = None
+        self,
+        controller: HistoryController,
+        *,
+        localizer: Localizer | None = None,
+        output_launcher: OutputLauncher | None = None,
     ) -> None:
         super().__init__()
         self._controller = controller
         self._localizer = localizer or Localizer()
+        self._output_launcher = output_launcher or QtOutputLauncher()
         self._cards: dict[str, HistoryCard] = {}
         self._pending_intents: dict[str, str] = {}
         self._shown_removal_result: tuple[str, bool] | None = None
@@ -76,7 +79,7 @@ class HistoryPage(QScrollArea):
         for item in state.items:
             card = self._cards.get(item.task_id)
             if card is None:
-                card = HistoryCard(item, self._localizer, self)
+                card = HistoryCard(item, self._localizer, self._output_launcher, self)
                 card.download_again.connect(self._download_again)
                 card.copy_source.connect(self._copy_source)
                 card.remove_requested.connect(self._remove)
@@ -147,10 +150,17 @@ class HistoryCard(QFrame):
     copy_source = Signal(str)
     remove_requested = Signal(str, bool)
 
-    def __init__(self, item: HistoryItemView, localizer: Localizer, parent: QWidget) -> None:
+    def __init__(
+        self,
+        item: HistoryItemView,
+        localizer: Localizer,
+        output_launcher: OutputLauncher,
+        parent: QWidget,
+    ) -> None:
         super().__init__(parent)
         self._item = item
         self._localizer = localizer
+        self._output_launcher = output_launcher
         self.setObjectName("downloadCard")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
@@ -217,11 +227,15 @@ class HistoryCard(QFrame):
 
     def _open_file(self) -> None:
         if self._item.actions.can_open_output and self._item.output_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._item.output_path))
+            self._output_launcher.open_file(
+                self._item.output_path, allowed=self._item.actions.can_open_output
+            )
 
     def _open_folder(self) -> None:
         if self._item.actions.can_open_output and self._item.output_path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self._item.output_path).parent)))
+            self._output_launcher.open_folder(
+                self._item.output_path, allowed=self._item.actions.can_open_output
+            )
 
     def _confirm_remove(self) -> None:
         dialog = QMessageBox(self)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence, QResizeEvent
@@ -71,6 +71,8 @@ class MediaFlowWindow(QMainWindow):
         self._navigation_buttons: dict[NavigationDestination, QToolButton] = {}
         self._pages: dict[NavigationDestination, QWidget] = {}
         self._shell_width = ShellWidth.STANDARD
+        self._close_request_handler: Callable[[], bool] | None = None
+        self._close_permitted = False
 
         self.setObjectName("mediaflowWindow")
         self.setWindowTitle(self._localizer.text(StringKey.APP_NAME))
@@ -142,6 +144,19 @@ class MediaFlowWindow(QMainWindow):
 
         self._theme_controller.set_mode(mode)
 
+    def set_close_request_handler(self, handler: Callable[[], bool] | None) -> None:
+        """Install the application-owned lifecycle decision for user close requests."""
+
+        assert_ui_thread(self)
+        self._close_request_handler = handler
+
+    def close_after_shutdown(self) -> None:
+        """Close once the lifecycle owner has received a clean shutdown report."""
+
+        assert_ui_thread(self)
+        self._close_permitted = True
+        self.close()
+
     def clamp_geometry(self) -> None:
         """Keep restored geometry visible when a monitor was removed or changed."""
 
@@ -167,6 +182,13 @@ class MediaFlowWindow(QMainWindow):
         return super().event(event)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        if (
+            not self._close_permitted
+            and self._close_request_handler is not None
+            and not self._close_request_handler()
+        ):
+            event.ignore()
+            return
         self._save_geometry()
         self.closed.emit()
         super().closeEvent(event)

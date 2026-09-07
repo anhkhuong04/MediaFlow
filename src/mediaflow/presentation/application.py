@@ -12,6 +12,8 @@ from mediaflow.presentation.design import ThemeController, ThemeMode
 from mediaflow.presentation.downloads import DownloadsPage
 from mediaflow.presentation.history import HistoryPage
 from mediaflow.presentation.home import HomePage
+from mediaflow.presentation.lifecycle import DesktopLifecycle
+from mediaflow.presentation.output_actions import QtOutputLauncher
 from mediaflow.presentation.settings import FirstRunDialog, SettingsPage
 from mediaflow.presentation.shell import NavigationDestination
 from mediaflow.presentation.strings import Language, Localizer
@@ -26,6 +28,7 @@ class DesktopRuntime:
     core_runtime: MediaFlowRuntime
     window: MediaFlowWindow
     presentation: PresentationCoordinator
+    lifecycle: DesktopLifecycle | None = None
     _shutdown_report: ShutdownReport | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -40,7 +43,7 @@ class DesktopRuntime:
             raise RuntimeError("Desktop runtime is already shut down")
         self.window.show()
 
-    def shutdown(self) -> None:
+    def shutdown(self) -> ShutdownReport | None:
         """Stop core work before hiding the owned top-level window.
 
         Qt can emit ``aboutToQuit`` and the entry point also calls this method in a
@@ -48,11 +51,13 @@ class DesktopRuntime:
         """
 
         if self.is_shutdown:
-            return
+            return self._shutdown_report
         self.application.aboutToQuit.disconnect(self.shutdown)
         self.presentation.close()
         self._shutdown_report = self.core_runtime.shutdown()
-        self.window.close()
+        if self._shutdown_report.clean:
+            self.window.close_after_shutdown()
+        return self._shutdown_report
 
 
 def build_desktop_runtime(
@@ -74,8 +79,13 @@ def build_desktop_runtime(
     )
     presentation = PresentationCoordinator(core_runtime.facade)
     home = HomePage(presentation.home, localizer=localizer)
-    downloads = DownloadsPage(presentation.downloads, localizer=localizer)
-    history = HistoryPage(presentation.history, localizer=localizer)
+    output_launcher = QtOutputLauncher()
+    downloads = DownloadsPage(
+        presentation.downloads, localizer=localizer, output_launcher=output_launcher
+    )
+    history = HistoryPage(
+        presentation.history, localizer=localizer, output_launcher=output_launcher
+    )
     settings = SettingsPage(
         presentation.settings,
         logs_directory=core_runtime.logs_directory,
@@ -101,14 +111,22 @@ def build_desktop_runtime(
             settings, presentation.settings, window, localizer, dependencies
         )
     )
-    window.closed.connect(presentation.close)
     presentation.start()
-    return DesktopRuntime(
+    runtime = DesktopRuntime(
         application=application,
         core_runtime=core_runtime,
         window=window,
         presentation=presentation,
     )
+    runtime.lifecycle = DesktopLifecycle(
+        application,
+        window,
+        presentation,
+        runtime.shutdown,
+        lambda: output_launcher.open_folder(str(core_runtime.logs_directory), allowed=True),
+        localizer,
+    )
+    return runtime
 
 
 def _analyze_history_source(home: HomePage, window: MediaFlowWindow, source_url: str) -> None:

@@ -122,6 +122,34 @@ class StringKey(StrEnum):
     CONTINUE = "action.continue"
     CONFIGURE = "action.configure"
     OPEN_LOGS = "action.open_logs"
+    COPY_DIAGNOSTICS = "action.copy_diagnostics"
+    ERROR_DETAILS_TITLE = "diagnostics.title"
+    DIAGNOSTICS_TASK_ID = "diagnostics.task_id"
+    DIAGNOSTICS_SOURCE = "diagnostics.source"
+    DIAGNOSTICS_STAGE = "diagnostics.stage"
+    DIAGNOSTICS_MESSAGE_KEY = "diagnostics.message_key"
+    DIAGNOSTICS_TECHNICAL_DETAIL = "diagnostics.technical_detail"
+    DIAGNOSTICS_TIMESTAMP = "diagnostics.timestamp"
+    CONFLICT_TITLE = "conflict.title"
+    CONFLICT_BODY = "conflict.body"
+    RENAME = "action.rename"
+    SKIP = "action.skip"
+    REPLACE = "action.replace"
+    DISK_SPACE_TITLE = "disk_space.title"
+    DISK_SPACE_BODY = "disk_space.body"
+    CHOOSE_ANOTHER_FOLDER = "action.choose_another_folder"
+    CLOSE_ACTIVE_TITLE = "lifecycle.close_active_title"
+    CLOSE_ACTIVE_BODY = "lifecycle.close_active_body"
+    CONTINUE_IN_TRAY = "action.continue_in_tray"
+    STOP_AND_EXIT = "action.stop_and_exit"
+    SHUTTING_DOWN = "lifecycle.shutting_down"
+    SHUTDOWN_TIMEOUT_TITLE = "lifecycle.shutdown_timeout_title"
+    SHUTDOWN_TIMEOUT_BODY = "lifecycle.shutdown_timeout_body"
+    TRAY_ACTIVE_COUNT = "tray.active_count"
+    TRAY_OPEN = "tray.open"
+    TRAY_EXIT = "tray.exit"
+    NOTIFICATION_COMPLETED_TITLE = "notification.completed_title"
+    NOTIFICATION_FAILED_TITLE = "notification.failed_title"
 
 
 _ENGLISH: dict[StringKey, str] = {
@@ -236,6 +264,43 @@ _ENGLISH: dict[StringKey, str] = {
     StringKey.CONTINUE: "Continue",
     StringKey.CONFIGURE: "Configure",
     StringKey.OPEN_LOGS: "Open logs",
+    StringKey.COPY_DIAGNOSTICS: "Copy diagnostics",
+    StringKey.ERROR_DETAILS_TITLE: "Error details",
+    StringKey.DIAGNOSTICS_TASK_ID: "Task ID",
+    StringKey.DIAGNOSTICS_SOURCE: "Source",
+    StringKey.DIAGNOSTICS_STAGE: "Stage",
+    StringKey.DIAGNOSTICS_MESSAGE_KEY: "Message key",
+    StringKey.DIAGNOSTICS_TECHNICAL_DETAIL: "Technical detail",
+    StringKey.DIAGNOSTICS_TIMESTAMP: "Timestamp",
+    StringKey.CONFLICT_TITLE: "Output file conflict",
+    StringKey.CONFLICT_BODY: "A file with this name already exists. Choose how to continue.",
+    StringKey.RENAME: "Rename",
+    StringKey.SKIP: "Skip",
+    StringKey.REPLACE: "Replace",
+    StringKey.DISK_SPACE_TITLE: "Not enough disk space",
+    StringKey.DISK_SPACE_BODY: (
+        "This download may need approximately {required} of free space; "
+        "approximately {available} is currently available."
+    ),
+    StringKey.CHOOSE_ANOTHER_FOLDER: "Choose another folder",
+    StringKey.CLOSE_ACTIVE_TITLE: "Downloads are still active",
+    StringKey.CLOSE_ACTIVE_BODY: (
+        "Keep MediaFlow running in the system tray, or stop work and exit. "
+        "Stopped work is recorded as Interrupted and can be resumed when supported."
+    ),
+    StringKey.CONTINUE_IN_TRAY: "Continue in tray",
+    StringKey.STOP_AND_EXIT: "Stop and exit",
+    StringKey.SHUTTING_DOWN: "Stopping active work safely…",
+    StringKey.SHUTDOWN_TIMEOUT_TITLE: "MediaFlow is still stopping work",
+    StringKey.SHUTDOWN_TIMEOUT_BODY: (
+        "The shutdown time limit was reached. MediaFlow remains open; "
+        "no worker was forcefully terminated."
+    ),
+    StringKey.TRAY_ACTIVE_COUNT: "{count} active download(s)",
+    StringKey.TRAY_OPEN: "Open MediaFlow",
+    StringKey.TRAY_EXIT: "Exit",
+    StringKey.NOTIFICATION_COMPLETED_TITLE: "Download completed",
+    StringKey.NOTIFICATION_FAILED_TITLE: "Download failed",
 }
 
 _VIETNAMESE: dict[StringKey, str] = {
