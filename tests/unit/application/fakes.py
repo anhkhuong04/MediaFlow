@@ -109,6 +109,9 @@ class InMemoryTaskRepository:
             )
         )
 
+    def remove(self, task_id: TaskId) -> bool:
+        return self.tasks.pop(task_id, None) is not None
+
 
 @dataclass(slots=True)
 class FakeProgressSink:

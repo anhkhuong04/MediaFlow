@@ -20,6 +20,7 @@ from mediaflow.application import (
     DownloadsView,
     EventSubscription,
     HistoryItemView,
+    HistoryRemovalView,
     InProcessEventBus,
     MediaConfigurationView,
     MediaKind,
@@ -43,9 +44,15 @@ from mediaflow.domain import (
     UtcTimestamp,
 )
 from mediaflow.presentation.bridge import PresentationCommandRunner, QtEventBridge
-from mediaflow.presentation.controllers import DownloadsController, HomeController, TaskAction
+from mediaflow.presentation.controllers import (
+    DownloadsController,
+    HistoryController,
+    HomeController,
+    TaskAction,
+)
 from mediaflow.presentation.coordinator import PresentationCoordinator
 from mediaflow.presentation.downloads import DownloadsPage
+from mediaflow.presentation.history import HistoryPage
 from mediaflow.presentation.home import HomePage
 from mediaflow.presentation.window import MediaFlowWindow
 
@@ -278,6 +285,32 @@ def test_downloads_page_updates_the_existing_card_for_one_task_event(qtbot: obje
     runner.close()
 
 
+def test_history_page_fetches_source_only_after_an_explicit_user_action(qtbot: object) -> None:
+    task_id = TaskId.new()
+    active_item = _item(task_id, "Saved media", None, status=DownloadStatus.COMPLETED)
+    facade = FakePresentationFacade(
+        items={str(task_id): active_item}, history_items=(_history_item(active_item),)
+    )
+    bridge = QtEventBridge(facade)
+    runner = PresentationCommandRunner(bridge)
+    controller = HistoryController(facade, runner)
+    page = HistoryPage(controller)
+    bridge.command_completed.connect(controller.handle_completion)
+    bridge.start()
+    _add_widget(qtbot, page)
+    page.show()
+    controller.refresh()
+    _wait_until(qtbot, lambda: str(task_id) in page._cards)
+    requested: list[str] = []
+    page.download_again_requested.connect(requested.append)
+
+    page._cards[str(task_id)].download_button.click()
+
+    _wait_until(qtbot, lambda: requested == ["https://example.com/media"])
+    bridge.close()
+    runner.close()
+
+
 def test_presentation_layer_does_not_depend_on_infrastructure_modules() -> None:
     presentation_root = Path(__file__).parents[2] / "src" / "mediaflow" / "presentation"
 
@@ -290,9 +323,15 @@ def test_presentation_layer_does_not_depend_on_infrastructure_modules() -> None:
 class FakePresentationFacade:
     """Deterministic C8-shaped fake; it contains no infrastructure adapter behavior."""
 
-    def __init__(self, *, items: dict[str, DownloadItemView] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        items: dict[str, DownloadItemView] | None = None,
+        history_items: tuple[HistoryItemView, ...] = (),
+    ) -> None:
         self.events = InProcessEventBus()
         self.items = dict(items or {})
+        self.history_items = history_items
         self.analysis_result: Future[CommandResult[MediaConfigurationView]] = Future()
         self.action_started = Event()
         self.allow_action = Event()
@@ -334,7 +373,12 @@ class FakePresentationFacade:
         return DownloadsView(DownloadSummaryView(0, len(items), 0, 0), items)
 
     def history(self) -> tuple[HistoryItemView, ...]:
-        return ()
+        return self.history_items
+
+    def remove_history(
+        self, task_id: str, *, delete_output: bool
+    ) -> CommandResult[HistoryRemovalView]:
+        return CommandResult.succeeded(HistoryRemovalView(task_id, delete_output, False))
 
     def task_details(self, task_id: str) -> CommandResult[TaskDetailsView]:
         item = self.items.get(task_id)
@@ -430,6 +474,21 @@ def _configuration_with_presets() -> MediaConfigurationView:
                 requires_processing=True,
             ),
         ),
+    )
+
+
+def _history_item(item: DownloadItemView) -> HistoryItemView:
+    return HistoryItemView(
+        task_id=item.task_id,
+        title=item.title,
+        status=item.status,
+        preset_kind=item.preset_kind,
+        quality=item.quality,
+        container=item.container,
+        finished_at=item.updated_at,
+        output_path=item.output_path,
+        failure=None,
+        actions=item.actions,
     )
 
 

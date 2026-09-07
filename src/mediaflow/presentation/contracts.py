@@ -10,6 +10,7 @@ from mediaflow.application import (
     DownloadItemView,
     DownloadsView,
     HistoryItemView,
+    HistoryRemovalView,
     SettingsView,
     TaskDetailsView,
 )
@@ -42,6 +43,10 @@ class PresentationFacade(Protocol):
     def downloads(self) -> DownloadsView: ...
 
     def history(self) -> tuple[HistoryItemView, ...]: ...
+
+    def remove_history(
+        self, task_id: str, *, delete_output: bool
+    ) -> CommandResult[HistoryRemovalView]: ...
 
     def task_details(self, task_id: str) -> CommandResult[TaskDetailsView]: ...
 

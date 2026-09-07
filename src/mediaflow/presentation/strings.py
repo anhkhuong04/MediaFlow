@@ -79,6 +79,17 @@ class StringKey(StrEnum):
     STATUS_FAILED = "status.failed"
     STATUS_CANCELLED = "status.cancelled"
     UNKNOWN_VALUE = "value.unknown"
+    HISTORY_TITLE = "history.title"
+    HISTORY_EMPTY = "history.empty"
+    DOWNLOAD_AGAIN = "action.download_again"
+    COPY_SOURCE_URL = "action.copy_source_url"
+    REMOVE_HISTORY = "action.remove_history"
+    DELETE_OUTPUT = "history.delete_output"
+    REMOVE_HISTORY_TITLE = "history.remove_title"
+    REMOVE_HISTORY_BODY = "history.remove_body"
+    REMOVE_HISTORY_CONFIRM = "history.remove_confirm"
+    OUTPUT_DELETE_RESULT = "history.output_delete_result"
+    OUTPUT_UNAVAILABLE = "history.output_unavailable"
 
 
 _ENGLISH: dict[StringKey, str] = {
@@ -148,6 +159,17 @@ _ENGLISH: dict[StringKey, str] = {
     StringKey.STATUS_FAILED: "Failed",
     StringKey.STATUS_CANCELLED: "Cancelled",
     StringKey.UNKNOWN_VALUE: "—",
+    StringKey.HISTORY_TITLE: "History",
+    StringKey.HISTORY_EMPTY: "No completed, failed, or cancelled downloads yet.",
+    StringKey.DOWNLOAD_AGAIN: "Download again",
+    StringKey.COPY_SOURCE_URL: "Copy source URL",
+    StringKey.REMOVE_HISTORY: "Remove from history",
+    StringKey.DELETE_OUTPUT: "Also delete the downloaded file",
+    StringKey.REMOVE_HISTORY_TITLE: "Remove this history entry?",
+    StringKey.REMOVE_HISTORY_BODY: "This removes the record from MediaFlow.",
+    StringKey.REMOVE_HISTORY_CONFIRM: "Remove entry",
+    StringKey.OUTPUT_DELETE_RESULT: "The downloaded file could not be removed.",
+    StringKey.OUTPUT_UNAVAILABLE: "The downloaded file is no longer available.",
 }
 
 _VIETNAMESE: dict[StringKey, str] = {

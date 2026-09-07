@@ -30,6 +30,10 @@ class FakeOutputInspector:
         del output_path
         return self.exists_value
 
+    def remove(self, output_path: OutputPath) -> bool:
+        del output_path
+        return self.exists_value
+
 
 @pytest.mark.parametrize(
     ("scenario", "expected"),

@@ -19,6 +19,7 @@ from mediaflow.application import (
     DownloadArtifact,
     DownloadItemView,
     EnqueueDownload,
+    HistoryRemovalView,
     InProcessEventBus,
     MediaConfigurationView,
     PrepareProcessingRetry,
@@ -38,6 +39,7 @@ from mediaflow.domain import (
     SourceUrl,
     StreamKind,
     TaskId,
+    TaskState,
     UtcTimestamp,
     VideoPreset,
 )
@@ -82,6 +84,13 @@ class FakeScheduler:
 class FakeOutputInspector:
     def exists(self, output_path: OutputPath) -> bool:
         return output_path.value.is_file()
+
+    def remove(self, output_path: OutputPath) -> bool:
+        try:
+            output_path.value.unlink()
+            return True
+        except OSError:
+            return False
 
 
 def test_facade_runs_analysis_off_caller_thread_and_queues_by_opaque_preset_id(
@@ -153,6 +162,34 @@ def test_facade_returns_safe_errors_and_settings_dependency_views(tmp_path: Path
         executor.shutdown(wait=True)
 
 
+def test_facade_removes_terminal_history_only_after_explicit_output_choice(tmp_path: Path) -> None:
+    facade, executor, _, repository, _ = _facade(
+        tmp_path, RecordingAnalyzer(AnalysisOutcome.succeeded(_media()))
+    )
+    try:
+        analyzed = facade.analyze("https://example.com/media").result.result(timeout=5)
+        assert analyzed.value is not None
+        queued = facade.enqueue(
+            configuration_id=analyzed.value.configuration_id,
+            preset_id_value="video.1080p.mp4.auto",
+            output_directory=str(tmp_path.resolve()),
+        )
+        assert queued.value is not None
+        task_id = TaskId.parse(queued.value.task_id)
+        task = repository.get(task_id)
+        assert task is not None
+        cancelled = task.transition(TaskState.CANCELLED, at=_at(20))
+        repository.replace(expected=task, updated=cancelled)
+
+        removed = facade.remove_history(str(task_id), delete_output=False)
+
+        assert isinstance(removed.value, HistoryRemovalView)
+        assert not removed.value.output_delete_requested
+        assert repository.get(task_id) is None
+    finally:
+        executor.shutdown(wait=True)
+
+
 def test_facade_contract_dataclasses_contain_no_raw_or_third_party_types() -> None:
     from mediaflow.application import (
         AttemptView,
@@ -160,6 +197,7 @@ def test_facade_contract_dataclasses_contain_no_raw_or_third_party_types() -> No
         DownloadSummaryView,
         DownloadsView,
         HistoryItemView,
+        HistoryRemovalView,
         PresetOptionView,
         ProgressView,
         SettingsView,
@@ -175,6 +213,7 @@ def test_facade_contract_dataclasses_contain_no_raw_or_third_party_types() -> No
         DownloadSummaryView,
         DownloadsView,
         HistoryItemView,
+        HistoryRemovalView,
         MediaConfigurationView,
         PresetOptionView,
         ProgressView,

@@ -67,6 +67,16 @@ def test_video_preset_fields_round_trip(tmp_path: Path) -> None:
     assert repository.get(task.task_id) == task
 
 
+def test_remove_deletes_one_task_and_cascades_dependent_records(tmp_path: Path) -> None:
+    repository = SQLiteTaskRepository(tmp_path / "mediaflow.db")
+    task = _task(tmp_path)
+    repository.add(task)
+
+    assert repository.remove(task.task_id)
+    assert repository.get(task.task_id) is None
+    assert not repository.remove(task.task_id)
+
+
 def test_processing_only_retry_attempt_round_trips_without_schema_change(
     tmp_path: Path,
 ) -> None:

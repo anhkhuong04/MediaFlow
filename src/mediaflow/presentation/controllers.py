@@ -14,6 +14,7 @@ from mediaflow.application import (
     DownloadSummaryView,
     DownloadsView,
     HistoryItemView,
+    HistoryRemovalView,
     MediaConfigurationView,
     OutputReady,
     SettingsView,
@@ -24,6 +25,7 @@ from mediaflow.application import (
     TaskStateChanged,
     UserMessage,
 )
+from mediaflow.domain import TaskState
 from mediaflow.presentation.bridge import (
     CommandCompletion,
     CommandKey,
@@ -88,6 +90,9 @@ class HistoryState:
 
     items: tuple[HistoryItemView, ...] = ()
     refresh: CommandState = CommandState()
+    details: tuple[TaskDetailsView, ...] = ()
+    removal: CommandState = CommandState()
+    removal_result: HistoryRemovalView | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -351,6 +356,7 @@ class HistoryController(QObject):
         self._runner = runner
         self._state = HistoryState()
         self._refresh_requested_while_busy = False
+        self._details_by_task_id: dict[str, TaskDetailsView] = {}
 
     @property
     def state(self) -> HistoryState:
@@ -371,24 +377,71 @@ class HistoryController(QObject):
 
     def handle_event(self, event: ApplicationEvent) -> None:
         assert_ui_thread(self)
-        if isinstance(event, (OutputReady, TaskFailed)):
+        if isinstance(event, (OutputReady, TaskFailed)) or (
+            isinstance(event, TaskStateChanged) and event.state is TaskState.CANCELLED
+        ):
             self.refresh()
+
+    def details_for(self, task_id: str) -> TaskDetailsView | None:
+        return self._details_by_task_id.get(task_id)
+
+    def load_details(self, task_id: str) -> bool:
+        assert_ui_thread(self)
+        key = CommandKey("history", "details", task_id)
+        return self._runner.submit(key, lambda: self._facade.task_details(task_id))
+
+    def remove(self, task_id: str, *, delete_output: bool) -> bool:
+        assert_ui_thread(self)
+        if self._state.removal.is_busy:
+            return False
+        key = CommandKey("history", "remove", task_id)
+        submitted = self._runner.submit(
+            key, lambda: self._facade.remove_history(task_id, delete_output=delete_output)
+        )
+        if submitted:
+            self._state = replace(self._state, removal=CommandState(is_busy=True))
+            self.state_changed.emit(self._state)
+        return submitted
 
     def handle_completion(self, completion: CommandCompletion) -> None:
         assert_ui_thread(self)
-        if completion.key != self._REFRESH:
+        if completion.key == self._REFRESH:
+            self._runner.release(completion.key)
+            history = completion.result.value
+            if isinstance(history, tuple) and all(
+                isinstance(item, HistoryItemView) for item in history
+            ):
+                self._state = replace(self._state, items=history)
+            self._state = replace(self._state, refresh=CommandState(error=completion.result.error))
+            self.state_changed.emit(self._state)
+            if self._refresh_requested_while_busy:
+                self._refresh_requested_while_busy = False
+                self.refresh()
             return
-        self._runner.release(completion.key)
-        history = completion.result.value
-        if isinstance(history, tuple) and all(
-            isinstance(item, HistoryItemView) for item in history
-        ):
-            self._state = replace(self._state, items=history)
-        self._state = replace(self._state, refresh=CommandState(error=completion.result.error))
-        self.state_changed.emit(self._state)
-        if self._refresh_requested_while_busy:
-            self._refresh_requested_while_busy = False
-            self.refresh()
+        if completion.key.screen != "history":
+            return
+        if completion.key.action == "details" and completion.key.subject_id is not None:
+            self._runner.release(completion.key)
+            if isinstance(completion.result.value, TaskDetailsView):
+                self._details_by_task_id[completion.key.subject_id] = completion.result.value
+                self._state = replace(self._state, details=tuple(self._details_by_task_id.values()))
+            self.state_changed.emit(self._state)
+            return
+        if completion.key.action == "remove":
+            self._runner.release(completion.key)
+            removed = completion.result.value
+            if isinstance(removed, HistoryRemovalView):
+                self._details_by_task_id.pop(removed.task_id, None)
+                self._state = replace(
+                    self._state,
+                    items=tuple(
+                        item for item in self._state.items if item.task_id != removed.task_id
+                    ),
+                    details=tuple(self._details_by_task_id.values()),
+                    removal_result=removed,
+                )
+            self._state = replace(self._state, removal=CommandState(error=completion.result.error))
+            self.state_changed.emit(self._state)
 
 
 class SettingsController(QObject):

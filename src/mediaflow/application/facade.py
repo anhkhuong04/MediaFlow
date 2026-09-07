@@ -44,6 +44,7 @@ from mediaflow.application.view_models import (
     DownloadItemView,
     DownloadsView,
     HistoryItemView,
+    HistoryRemovalView,
     MediaConfigurationView,
     SettingsView,
     TaskDetailsView,
@@ -287,6 +288,35 @@ class ApplicationFacade:
             recovery_store=self._recovery_store,
             output_files=self._output_files,
         )
+
+    def remove_history(
+        self, task_id: str, *, delete_output: bool
+    ) -> CommandResult[HistoryRemovalView]:
+        """Remove a terminal record; output deletion is explicit and never implied."""
+
+        parsed = self._parse_task_id(task_id)
+        task = self._repository.get(parsed) if parsed is not None else None
+        if task is None or task.state not in {
+            TaskState.COMPLETED,
+            TaskState.FAILED,
+            TaskState.CANCELLED,
+        }:
+            return CommandResult.failed(command_message("error.action_unavailable"))
+        output_path = task.current_attempt.output_path
+        try:
+            if parsed is None or not self._repository.remove(parsed):
+                return CommandResult.failed(command_message("error.task_not_found"))
+        except (OSError, RuntimeError):
+            return CommandResult.failed(command_message("error.action_unavailable"))
+        try:
+            output_deleted = (
+                self._output_files.remove(output_path)
+                if delete_output and output_path is not None
+                else False
+            )
+        except OSError:
+            output_deleted = False
+        return CommandResult.succeeded(HistoryRemovalView(task_id, delete_output, output_deleted))
 
     def task_details(self, task_id: str) -> CommandResult[TaskDetailsView]:
         parsed = self._parse_task_id(task_id)

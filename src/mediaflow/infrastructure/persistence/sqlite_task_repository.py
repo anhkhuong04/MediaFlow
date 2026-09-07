@@ -112,6 +112,21 @@ class SQLiteTaskRepository:
         """
         return self._list_tasks(query, terminal_values)
 
+    def remove(self, task_id: TaskId) -> bool:
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                "DELETE FROM download_tasks WHERE task_id = ?", (str(task_id),)
+            )
+            connection.commit()
+            return cursor.rowcount == 1
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def _list_tasks(self, query: str, parameters: tuple[str, ...] = ()) -> tuple[DownloadTask, ...]:
         with closing(self._connect()) as connection:
             task_ids = tuple(

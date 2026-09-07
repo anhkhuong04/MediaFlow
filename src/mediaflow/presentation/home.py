@@ -89,6 +89,12 @@ class HomePage(QScrollArea):
     def focus_url_input(self) -> None:
         self.url_input.setFocus()
 
+    def analyze_source(self, source_url: str) -> bool:
+        """Accept a deliberate source action from History without exposing the facade."""
+
+        self.url_input.setText(source_url)
+        return self._controller.analyze(source_url)
+
     def render_state(self, state: HomeState) -> None:
         """Render controller state on the GUI thread without recreating the screen."""
 

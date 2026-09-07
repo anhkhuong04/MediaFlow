@@ -85,6 +85,10 @@ class RecoveryStore(Protocol):
 class OutputFileInspector(Protocol):
     def exists(self, output_path: OutputPath) -> bool: ...
 
+    def remove(self, output_path: OutputPath) -> bool:
+        """Delete exactly one final output file selected by an explicit user command."""
+        ...
+
 
 class TaskScheduler(Protocol):
     def enqueue(self, task_id: TaskId) -> None: ...
@@ -121,6 +125,10 @@ class TaskRepository(Protocol):
 
     def list_history(self) -> tuple[DownloadTask, ...]:
         """Return terminal tasks, newest terminal attempt first."""
+        ...
+
+    def remove(self, task_id: TaskId) -> bool:
+        """Remove one task and its dependent durable records; return false if absent."""
         ...
 
 

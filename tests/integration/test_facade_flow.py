@@ -51,6 +51,13 @@ class ExistingOutputInspector:
     def exists(self, output_path: OutputPath) -> bool:
         return output_path.value.is_file()
 
+    def remove(self, output_path: OutputPath) -> bool:
+        try:
+            output_path.value.unlink()
+            return True
+        except OSError:
+            return False
+
 
 class IncrementingClock:
     def __init__(self) -> None:

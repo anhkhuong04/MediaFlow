@@ -147,6 +147,15 @@ class HistoryItemView:
 
 
 @dataclass(frozen=True, slots=True)
+class HistoryRemovalView:
+    """Result of an explicit history-removal command, without exposing a path."""
+
+    task_id: str
+    output_delete_requested: bool
+    output_deleted: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SettingsView:
     default_output_directory: str
     default_preset_id: str
