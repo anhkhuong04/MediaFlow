@@ -89,11 +89,11 @@ class DesignTokens:
     typography: TypographyTokens = TypographyTokens()
     radius: RadiusTokens = RadiusTokens()
     light: PaletteTokens = PaletteTokens(
-        window="#f5f6f8",
+        window="#f8fafc",
         surface="#ffffff",
-        surface_raised="#f9fafb",
-        border="#d8dce3",
-        text="#1d2430",
+        surface_raised="#f8fafc",
+        border="#e2e8f0",
+        text="#0f172a",
         text_secondary="#526071",
         disabled_text="#7a8492",
         accent="#0f6cbd",
@@ -104,11 +104,11 @@ class DesignTokens:
         error="#c42b1c",
     )
     dark: PaletteTokens = PaletteTokens(
-        window="#1b1d21",
-        surface="#22252b",
-        surface_raised="#2a2e35",
-        border="#424851",
-        text="#f1f3f5",
+        window="#0f172a",
+        surface="#111827",
+        surface_raised="#1e293b",
+        border="#334155",
+        text="#f8fafc",
         text_secondary="#c2c8d0",
         disabled_text="#89919d",
         accent="#4ca5ff",

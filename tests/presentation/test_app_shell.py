@@ -56,14 +56,14 @@ def test_theme_change_preserves_navigation_and_keyboard_focus(qtbot: object) -> 
     assert window.theme_controller.mode is ThemeMode.DARK
     assert _current_destination(window) is NavigationDestination.SETTINGS
     assert settings is window.navigation_button(NavigationDestination.SETTINGS)
-    assert "#1b1d21" in _application_stylesheet()
+    assert "#0f172a" in _application_stylesheet()
     assert "#79b8ff" in _application_stylesheet()
 
     window.set_theme_mode(ThemeMode.SYSTEM)
     window.theme_controller.apply_system_color_scheme(Qt.ColorScheme.Light)
 
     assert window.theme_controller.mode.value == ThemeMode.SYSTEM.value
-    assert "#f5f6f8" in _application_stylesheet()
+    assert "#f8fafc" in _application_stylesheet()
     assert "#005fb8" in _application_stylesheet()
 
 
