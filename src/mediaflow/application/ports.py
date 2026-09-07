@@ -5,6 +5,7 @@ them away from the presentation thread; these protocols deliberately contain no
 Qt concepts.
 """
 
+from collections.abc import Callable
 from typing import Protocol
 
 from mediaflow.application.events import ApplicationEvent
@@ -19,7 +20,14 @@ from mediaflow.application.models import (
     ProcessingJob,
     ProcessingOutcome,
 )
-from mediaflow.domain import DownloadTask, ProgressSnapshot, SourceUrl, TaskId, UtcTimestamp
+from mediaflow.domain import (
+    DownloadTask,
+    OutputPath,
+    ProgressSnapshot,
+    SourceUrl,
+    TaskId,
+    UtcTimestamp,
+)
 
 
 class TaskRepositoryConflict(RuntimeError):
@@ -72,6 +80,26 @@ class RecoveryStore(Protocol):
     def load_processing_artifact(self, task: DownloadTask) -> DownloadArtifact | None: ...
 
     def cleanup(self, task: DownloadTask, disposition: CleanupDisposition) -> None: ...
+
+
+class OutputFileInspector(Protocol):
+    def exists(self, output_path: OutputPath) -> bool: ...
+
+
+class TaskScheduler(Protocol):
+    def enqueue(self, task_id: TaskId) -> None: ...
+
+    def enqueue_processing(self, task_id: TaskId, artifact: DownloadArtifact) -> None: ...
+
+    def cancel(self, task_id: TaskId) -> bool: ...
+
+
+class EventSubscription(Protocol):
+    def close(self) -> None: ...
+
+
+class EventSource(Protocol):
+    def subscribe(self, subscriber: Callable[[ApplicationEvent], None]) -> EventSubscription: ...
 
 
 class TaskRepository(Protocol):

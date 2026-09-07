@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C7 hoàn thành — tiếp theo C8 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C8 hoàn thành — tiếp theo C9 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -96,6 +96,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-017 | `INTERRUPTED` persist cả execution stage trước đó; startup chỉ reconcile `DOWNLOADING`/`PROCESSING`/`PAUSED` và recovery là idempotent | Không để active state giả sau crash và không phải suy đoán download/processing resume từ tên file. |
 | D-018 | Resume download chỉ hợp lệ khi attempt có partial file không rỗng; processing resume/retry chỉ hợp lệ khi manifest và toàn bộ input còn tồn tại | Fallback thiếu dữ liệu trả mã `resume.*_missing`, không âm thầm biến resume thành full retry. Manifest chỉ chứa relative path và normalized stream facts, không chứa URL/raw metadata/secret. |
 | D-019 | Shutdown ngừng admission, giữ task pending ở `QUEUED`, persist task active thành `INTERRUPTED` trước cooperative cancellation và bounded wait | Timeout được trả về bằng report `clean=false`; late worker result không được ghi đè durable interrupted state. Staging chỉ tự xóa theo success policy, còn cancel/failure/interrupted mặc định được giữ. |
+| D-020 | UI-facing facade dùng opaque configuration/preset/task ID và trả immutable read models thay vì domain aggregate | Presentation render đủ metadata, summary, details, history và capability mà không giữ task state hoặc biết raw engine/database/process data. |
+| D-021 | Analyze chạy trên executor riêng; application event subscription gọi subscriber trên publishing thread và Qt bridge chịu trách nhiệm marshal | Không block UI thread, không kéo Qt vào core và subscriber lỗi không rollback durable state hoặc làm dừng worker. |
+| D-022 | `bootstrap.py` là nơi duy nhất chọn SQLite, JSON settings, yt-dlp, FFmpeg, filesystem và executors cụ thể | Giữ dependency direction; application facade chỉ phụ thuộc port do core sở hữu và có thể contract-test hoàn toàn bằng fake. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -315,13 +318,13 @@ Checkpoint đề xuất: `feat(core): recover interrupted tasks and retries`
 
 Mục tiêu: cung cấp contract đủ để xây Home, Downloads, History và Settings mà không lộ infrastructure.
 
-- [ ] **C8.1** Tạo application facade/command bus nhỏ cho analyze, enqueue, cancel, retry/resume và queries.
-- [ ] **C8.2** Tạo read models cho media configuration, downloads summary/list, task details và history.
-- [ ] **C8.3** Tạo event subscription contract thread-agnostic; Qt bridge sẽ marshal sang UI thread ở presentation layer.
-- [ ] **C8.4** Cung cấp action capability theo state (`can_cancel`, `can_retry`, `can_resume`, `can_open_output`) thay vì để UI tự đoán.
-- [ ] **C8.5** Chuẩn hóa user-safe error/message keys, technical details và suggested action.
-- [ ] **C8.6** Tạo composition root nối ports với SQLite, yt-dlp, FFmpeg, settings và worker executor.
-- [ ] **C8.7** Contract tests chứng minh UI-facing API không trả raw engine/database/process types.
+- [x] **C8.1** Tạo application facade/command bus nhỏ cho analyze, enqueue, cancel, retry/resume và queries.
+- [x] **C8.2** Tạo read models cho media configuration, downloads summary/list, task details và history.
+- [x] **C8.3** Tạo event subscription contract thread-agnostic; Qt bridge sẽ marshal sang UI thread ở presentation layer.
+- [x] **C8.4** Cung cấp action capability theo state (`can_cancel`, `can_retry`, `can_resume`, `can_open_output`) thay vì để UI tự đoán.
+- [x] **C8.5** Chuẩn hóa user-safe error/message keys, technical details và suggested action.
+- [x] **C8.6** Tạo composition root nối ports với SQLite, yt-dlp, FFmpeg, settings và worker executor.
+- [x] **C8.7** Contract tests chứng minh UI-facing API không trả raw engine/database/process types.
 
 Acceptance criteria:
 
@@ -406,6 +409,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C8 hoàn thành:** Thêm `ApplicationFacade` cho analyze async, enqueue, cancel, retry, resume, explicit restart, processing-only retry, downloads/history/task details, settings và dependency status. Analyze chạy trên executor riêng và trả `CommandResult`/`MediaConfigurationView` bằng opaque configuration/preset ID; presentation không cần giữ `MediaInfo` hoặc `DownloadTask`. Read models immutable bao phủ media configuration, preset availability, download summary/item/progress, attempt details, history, settings, dependency status và action capability kiểm tra cả lifecycle lẫn recovery/output thực tế. `UserMessage` chỉ chứa localization keys, stable technical code và suggested action; không đưa raw exception làm primary message. `InProcessEventBus` có subscription đóng idempotent, thread-agnostic và cô lập subscriber failure. Thêm JSON settings store atomic, output inspector và `bootstrap.py` làm composition root duy nhất cho SQLite, yt-dlp, FFmpeg, filesystem và executors; startup recovery chạy trước khi requeue persisted `QUEUED` task. Headless contract client chạy analyze → enqueue → download → processing → completed → history không dùng PySide6; type audit không phát hiện raw Qt/yt-dlp/SQLite/subprocess type. Toàn bộ 295 offline tests chạy xanh, 1 live smoke test deselect.
 - **2026-09-07 — C7 hoàn thành:** Startup recovery reconcile durable `DOWNLOADING`/`PROCESSING`/`PAUSED` sang `INTERRUPTED`, persist execution stage nguồn bằng migration v3 và chạy idempotent khi reopen SQLite. Download resume giữ nguyên attempt và chỉ được chuẩn bị khi staging có partial file không rỗng; nếu thiếu trả mã `resume.partial_missing` thay vì tải lại ngầm. Download adapter ghi manifest atomic chỉ gồm relative artifact paths/stream facts; processing resume và processing-only retry yêu cầu manifest cùng input hợp lệ, giữ nguyên immutable request và attempt history. Queue nhận processing-only work mà không gọi downloader. Shutdown coordinator ngừng nhận task mới, giữ pending task ở `QUEUED`, persist active work thành `INTERRUPTED` trước cooperative cancellation, bounded wait và trả report trung thực khi timeout; late worker không thể ghi đè state phục hồi. Cleanup policy chỉ xóa app-owned attempt staging sau success, mặc định giữ dữ liệu khi cancel/failure/interrupted. Toàn bộ 283 offline tests chạy xanh, 1 live smoke test deselect.
 - **2026-09-07 — C6 hoàn thành:** Thêm dependency report typed cho yt-dlp/FFmpeg/FFprobe và probe version/status; process runner dùng argument tuple với `shell=False`, capture stdout/stderr, timeout, cooperative cancel và reap process. FFmpeg adapter hỗ trợ merge video/audio, remux combined video, M4A/MP3 conversion và copy audio gốc; mọi output được tạo ở temporary sibling, kiểm tra non-empty + FFprobe, publish atomic rồi kiểm tra final file trước khi application commit `COMPLETED`. Filename Windows xử lý invalid/control chars, reserved names, trailing dot/space, collision và path budget; conflict mặc định `rename`, `skip` không ghi file và `replace` chỉ overwrite khi explicit. Disk-space contract luôn đánh dấu estimate. Failure/cancel chỉ dọn unpublished generated output và giữ downloaded inputs; success mới dọn input staging. Queue chạy trọn download→processing trên worker, không xử lý trong future callback; processing-only retry tạo attempt `PROCESSING` mới và không gọi downloader. Toàn bộ 274 offline tests chạy xanh, 1 live smoke test deselect; probe thật trên máy phát hiện yt-dlp `2026.08.19` ready, FFmpeg/FFprobe chưa có trên `PATH`, nên FFmpeg behavior được xác nhận bằng fake runner/temp filesystem chứ chưa có live media smoke.
 - **2026-09-07 — C5 hoàn thành:** Thêm Queue Manager FIFO dùng bounded `ThreadPoolExecutor`, configurable concurrency và lifecycle sở hữu tài nguyên rõ ràng; mọi download chạy trên worker thread, slot được release bằng completion callback cho success/failure/cancel. `DownloadManager` là state owner duy nhất, commit repository trước event, settle cancel/failure/success atomically và chỉ chuyển download thành công sang `PROCESSING`. yt-dlp downloader nhận immutable job/selector, dùng staging riêng theo task/attempt, không overwrite, giữ `.part` khi cancel/failure, không dùng browser cookie, loại DRM và tắt implicit merge để dành processing/final verification cho C6. Raw progress được normalize trung thực, event coalesce 250 ms, durable checkpoint 5 giây và callback/worker failure được cô lập. Stress/FIFO/race/cancel/adapter tests hoàn toàn offline; toàn bộ 236 tests chạy xanh, 1 live smoke test được deselect mặc định.
