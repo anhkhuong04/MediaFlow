@@ -42,10 +42,10 @@ def test_selects_exact_video_quality_and_best_audio() -> None:
     )
 
     assert selection.format_selector == (
-        "bestvideo[height=1080][fps=60][has_drm!=True]+bestaudio[has_drm!=True]/"
-        "best[height=1080][fps=60][vcodec!=none][acodec!=none][has_drm!=True]/"
-        "bestvideo[height=1080][has_drm!=True]+bestaudio[has_drm!=True]/"
-        "best[height=1080][vcodec!=none][acodec!=none][has_drm!=True]"
+        "bestvideo[height=1080][fps=60][has_drm!=?true]+bestaudio[has_drm!=?true]/"
+        "best[height=1080][fps=60][vcodec!=none][acodec!=none][has_drm!=?true]/"
+        "bestvideo[height=1080][has_drm!=?true]+bestaudio[has_drm!=?true]/"
+        "best[height=1080][vcodec!=none][acodec!=none][has_drm!=?true]"
     )
     assert selection.output_container == "mkv"
     assert not selection.extract_audio
@@ -55,8 +55,8 @@ def test_best_video_uses_provider_independent_selector() -> None:
     selection = select_format(media(), VideoPreset(quality=VideoQuality.BEST))
 
     assert selection.format_selector == (
-        "bestvideo[has_drm!=True]+bestaudio[has_drm!=True]/"
-        "best[vcodec!=none][acodec!=none][has_drm!=True]"
+        "bestvideo[has_drm!=?true]+bestaudio[has_drm!=?true]/"
+        "best[vcodec!=none][acodec!=none][has_drm!=?true]"
     )
 
 
@@ -64,8 +64,8 @@ def test_exact_combined_quality_has_no_lower_resolution_fallback() -> None:
     selection = select_format(media(), VideoPreset(quality=VideoQuality.P720))
 
     assert selection.format_selector == (
-        "bestvideo[height=720][has_drm!=True]+bestaudio[has_drm!=True]/"
-        "best[height=720][vcodec!=none][acodec!=none][has_drm!=True]"
+        "bestvideo[height=720][has_drm!=?true]+bestaudio[has_drm!=?true]/"
+        "best[height=720][vcodec!=none][acodec!=none][has_drm!=?true]"
     )
 
 
@@ -82,7 +82,7 @@ def test_audio_preset_selects_best_audio(
 ) -> None:
     selection = select_format(media(), AudioPreset(container=container))
 
-    assert selection.format_selector == "bestaudio[has_drm!=True]/best[has_drm!=True]"
+    assert selection.format_selector == "bestaudio[has_drm!=?true]/best[has_drm!=?true]"
     assert selection.extract_audio
     assert selection.audio_output_format == expected_output
 
@@ -102,8 +102,8 @@ def test_download_request_can_rebuild_selector_without_provider_format_ids() -> 
     selection = build_format_selection(VideoPreset(quality=VideoQuality.P1440))
 
     assert selection.format_selector == (
-        "bestvideo[height=1440][has_drm!=True]+bestaudio[has_drm!=True]/"
-        "best[height=1440][vcodec!=none][acodec!=none][has_drm!=True]"
+        "bestvideo[height=1440][has_drm!=?true]+bestaudio[has_drm!=?true]/"
+        "best[height=1440][vcodec!=none][acodec!=none][has_drm!=?true]"
     )
     assert "v1080-60" not in selection.format_selector
 

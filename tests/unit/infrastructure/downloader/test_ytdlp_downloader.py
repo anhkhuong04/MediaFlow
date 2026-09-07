@@ -152,7 +152,7 @@ def test_adapter_builds_safe_reproducible_options_and_normalizes_artifact(
     assert parameters["overwrites"] is False
     assert parameters["noplaylist"] is True
     assert parameters["allow_unplayable_formats"] is True
-    assert "has_drm!=True" in str(parameters["format"])
+    assert "has_drm!=?true" in str(parameters["format"])
     assert "cookiefile" not in parameters
     assert "cookiesfrombrowser" not in parameters
     staging = tmp_path / ".mediaflow-staging" / str(_TASK_ID) / str(_ATTEMPT_ID)

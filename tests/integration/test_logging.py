@@ -28,16 +28,20 @@ def test_utf8_and_safe_context(tmp_path: Path) -> None:
 def test_untrusted_data_is_not_serialized(tmp_path: Path) -> None:
     logger = configure_logging(tmp_path)
     secret = "private-session-123"
+    sensitive_path = r"C:\Users\Private Person\Downloads\paid-media.mp4"
     logger.warning("Authorization: Bearer %s", secret)
     logger.info({"cookie": secret})
     try:
         raise ValueError(secret)
     except ValueError:
         logger.exception(
-            "application.failed", extra={"cookie": secret, "task_id": secret}, stack_info=True
+            "application.failed",
+            extra={"cookie": secret, "task_id": secret, "output_path": sensitive_path},
+            stack_info=True,
         )
     content = (tmp_path / "mediaflow.log").read_text(encoding="utf-8")
     assert secret not in content
+    assert sensitive_path not in content
     assert "Traceback" not in content
     assert [json.loads(line)["event"] for line in content.splitlines()] == [
         "suppressed",

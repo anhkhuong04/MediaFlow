@@ -1,3 +1,5 @@
+"""Real child-process checks using Python itself as the controlled fake executable."""
+
 import sys
 
 from mediaflow.infrastructure.media import ProcessTermination, SubprocessRunner
@@ -35,14 +37,19 @@ def test_runner_preserves_argument_boundaries_and_captures_both_streams() -> Non
     assert "problem" in result.stderr
 
 
-def test_runner_returns_nonzero_exit_without_raising() -> None:
+def test_runner_returns_stderr_failure_without_raising() -> None:
     result = SubprocessRunner().run(
-        (sys.executable, "-c", "raise SystemExit(7)"),
+        (
+            sys.executable,
+            "-c",
+            "import sys; print('controlled failure', file=sys.stderr); raise SystemExit(7)",
+        ),
         cancellation=NeverCancelled(),
         timeout_seconds=5,
     )
     assert result.termination is ProcessTermination.EXITED
     assert result.exit_code == 7
+    assert result.stderr.strip() == "controlled failure"
     assert not result.succeeded
 
 

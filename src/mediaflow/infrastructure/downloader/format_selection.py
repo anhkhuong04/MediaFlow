@@ -44,7 +44,7 @@ def build_format_selection(preset: DownloadPreset) -> YtDlpFormatSelection:
             None if preset.container is AudioContainer.ORIGINAL else preset.container.value
         )
         return YtDlpFormatSelection(
-            format_selector="bestaudio[has_drm!=True]/best[has_drm!=True]",
+            format_selector="bestaudio[has_drm!=?true]/best[has_drm!=?true]",
             output_container=None,
             extract_audio=True,
             audio_output_format=output_format,
@@ -53,7 +53,10 @@ def build_format_selection(preset: DownloadPreset) -> YtDlpFormatSelection:
     quality_filter = ""
     if preset.quality is not VideoQuality.BEST:
         quality_filter = f"[height={_QUALITY_HEIGHT[preset.quality]}]"
-    playable_filter = "[has_drm!=True]"
+    # Extractors are allowed to omit ``has_drm`` for known-playable formats.
+    # yt-dlp's ``!=?`` operator accepts an unknown field while still excluding
+    # an explicit true value.
+    playable_filter = "[has_drm!=?true]"
     combined_filter = f"{quality_filter}[vcodec!=none][acodec!=none]{playable_filter}"
     base_selector = (
         f"bestvideo{quality_filter}{playable_filter}+bestaudio{playable_filter}/"

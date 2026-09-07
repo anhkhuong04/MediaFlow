@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C8 hoàn thành — tiếp theo C9 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C9 hoàn thành — Core V1 sẵn sàng cho triển khai UI`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -99,6 +99,8 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-020 | UI-facing facade dùng opaque configuration/preset/task ID và trả immutable read models thay vì domain aggregate | Presentation render đủ metadata, summary, details, history và capability mà không giữ task state hoặc biết raw engine/database/process data. |
 | D-021 | Analyze chạy trên executor riêng; application event subscription gọi subscriber trên publishing thread và Qt bridge chịu trách nhiệm marshal | Không block UI thread, không kéo Qt vào core và subscriber lỗi không rollback durable state hoặc làm dừng worker. |
 | D-022 | `bootstrap.py` là nơi duy nhất chọn SQLite, JSON settings, yt-dlp, FFmpeg, filesystem và executors cụ thể | Giữ dependency direction; application facade chỉ phụ thuộc port do core sở hữu và có thể contract-test hoàn toàn bằng fake. |
+| D-023 | C9 release gate lấy offline integration làm điều kiện quyết định; live smoke nhận URL qua environment và chỉ xác nhận adapter thực sự khả dụng trên máy gate | Website không trở thành dependency của suite. Máy thiếu FFmpeg/FFprobe vẫn có thể xác nhận core và basic download; dependency status phải trung thực và live processing được ghi rõ là chưa chạy. |
+| D-024 | DRM selector dùng `has_drm!=?true`: loại explicit DRM nhưng chấp nhận extractor không khai báo field | Live smoke phát hiện `has_drm!=True` loại nhầm format Wikimedia hợp lệ vì unknown value; cú pháp `!=?` tuân theo format-filter semantics của yt-dlp và vẫn không chọn format xác định có DRM. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -340,13 +342,13 @@ Checkpoint đề xuất: `feat(core): expose application facade for desktop UI`
 
 Mục tiêu: xác nhận core đủ ổn định để bắt đầu triển khai UI đầy đủ.
 
-- [ ] **C9.1** End-to-end test với fake analyzer/downloader/processor + SQLite thật trong temporary directory.
-- [ ] **C9.2** Integration test subprocess giả cho success, stderr failure, timeout và cancel.
-- [ ] **C9.3** Test queue nhiều task: mixed success/failure/cancel, restart giữa chừng và processing failure.
-- [ ] **C9.4** Audit log/error/diagnostics để bảo đảm redaction cookie/token/path nhạy cảm theo policy.
-- [ ] **C9.5** Chạy format, lint, type check, full offline tests và kiểm tra clean shutdown.
-- [ ] **C9.6** Chạy manual smoke test có kiểm soát với một URL được phép tải; ghi version yt-dlp/FFmpeg và không biến URL đó thành dependency của test suite.
-- [ ] **C9.7** Cập nhật architecture notes và `task.md` theo implementation thực tế; không để quyết định quan trọng chỉ nằm trong code.
+- [x] **C9.1** End-to-end test với fake analyzer/downloader/processor + SQLite thật trong temporary directory.
+- [x] **C9.2** Integration test subprocess giả cho success, stderr failure, timeout và cancel.
+- [x] **C9.3** Test queue nhiều task: mixed success/failure/cancel, restart giữa chừng và processing failure.
+- [x] **C9.4** Audit log/error/diagnostics để bảo đảm redaction cookie/token/path nhạy cảm theo policy.
+- [x] **C9.5** Chạy format, lint, type check, full offline tests và kiểm tra clean shutdown.
+- [x] **C9.6** Chạy manual smoke test có kiểm soát với một URL được phép tải; ghi version yt-dlp/FFmpeg và không biến URL đó thành dependency của test suite.
+- [x] **C9.7** Cập nhật architecture notes và `task.md` theo implementation thực tế; không để quyết định quan trọng chỉ nằm trong code.
 
 Acceptance criteria:
 
@@ -409,6 +411,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C9 hoàn thành:** Thêm core release integration gate chạy fake analyzer/downloader/processor qua `ApplicationFacade` với SQLite thật, verify output/history rồi reopen database; multi-task gate bao phủ success, download network failure, processing failure, queued/active cancel, restart giữa chừng và attempt history. Chuyển controlled Python child-process checks sang integration scope cho success, stderr/nonzero exit, timeout, cancel/reap và missing executable; privacy audit xác nhận allowlist logger không serialize cookie/token/local path/traceback, credential-bearing URL bị chặn và public diagnostic/message chỉ lộ stable code với suggested action đúng failure lane. Live smoke opt-in dùng Wikimedia Commons `Sintel_trailer-1080p.ogv` (CC BY 3.0), analyze và tải artifact không rỗng thành công với yt-dlp `2026.08.19`; URL chỉ đi qua `MEDIAFLOW_SMOKE_URL`, không hard-code vào suite. Smoke phát hiện và sửa selector DRM từ `has_drm!=True` sang `has_drm!=?true` để không loại format có DRM field unknown nhưng vẫn loại explicit DRM. FFmpeg/FFprobe vẫn `not_found` trên máy gate nên live processing chưa chạy; fake process/filesystem và subprocess integration là bằng chứng cho nhánh đó, dependency view sẽ báo đúng cho UI. Architecture thực tế được ghi tại `docs/core-architecture.md`. Ruff format/lint, mypy strict, lock/dependency checks và toàn bộ `309` offline tests chạy xanh; `1` smoke test deselect mặc định và chạy xanh khi opt-in.
 - **2026-09-07 — C8 hoàn thành:** Thêm `ApplicationFacade` cho analyze async, enqueue, cancel, retry, resume, explicit restart, processing-only retry, downloads/history/task details, settings và dependency status. Analyze chạy trên executor riêng và trả `CommandResult`/`MediaConfigurationView` bằng opaque configuration/preset ID; presentation không cần giữ `MediaInfo` hoặc `DownloadTask`. Read models immutable bao phủ media configuration, preset availability, download summary/item/progress, attempt details, history, settings, dependency status và action capability kiểm tra cả lifecycle lẫn recovery/output thực tế. `UserMessage` chỉ chứa localization keys, stable technical code và suggested action; không đưa raw exception làm primary message. `InProcessEventBus` có subscription đóng idempotent, thread-agnostic và cô lập subscriber failure. Thêm JSON settings store atomic, output inspector và `bootstrap.py` làm composition root duy nhất cho SQLite, yt-dlp, FFmpeg, filesystem và executors; startup recovery chạy trước khi requeue persisted `QUEUED` task. Headless contract client chạy analyze → enqueue → download → processing → completed → history không dùng PySide6; type audit không phát hiện raw Qt/yt-dlp/SQLite/subprocess type. Toàn bộ 295 offline tests chạy xanh, 1 live smoke test deselect.
 - **2026-09-07 — C7 hoàn thành:** Startup recovery reconcile durable `DOWNLOADING`/`PROCESSING`/`PAUSED` sang `INTERRUPTED`, persist execution stage nguồn bằng migration v3 và chạy idempotent khi reopen SQLite. Download resume giữ nguyên attempt và chỉ được chuẩn bị khi staging có partial file không rỗng; nếu thiếu trả mã `resume.partial_missing` thay vì tải lại ngầm. Download adapter ghi manifest atomic chỉ gồm relative artifact paths/stream facts; processing resume và processing-only retry yêu cầu manifest cùng input hợp lệ, giữ nguyên immutable request và attempt history. Queue nhận processing-only work mà không gọi downloader. Shutdown coordinator ngừng nhận task mới, giữ pending task ở `QUEUED`, persist active work thành `INTERRUPTED` trước cooperative cancellation, bounded wait và trả report trung thực khi timeout; late worker không thể ghi đè state phục hồi. Cleanup policy chỉ xóa app-owned attempt staging sau success, mặc định giữ dữ liệu khi cancel/failure/interrupted. Toàn bộ 283 offline tests chạy xanh, 1 live smoke test deselect.
 - **2026-09-07 — C6 hoàn thành:** Thêm dependency report typed cho yt-dlp/FFmpeg/FFprobe và probe version/status; process runner dùng argument tuple với `shell=False`, capture stdout/stderr, timeout, cooperative cancel và reap process. FFmpeg adapter hỗ trợ merge video/audio, remux combined video, M4A/MP3 conversion và copy audio gốc; mọi output được tạo ở temporary sibling, kiểm tra non-empty + FFprobe, publish atomic rồi kiểm tra final file trước khi application commit `COMPLETED`. Filename Windows xử lý invalid/control chars, reserved names, trailing dot/space, collision và path budget; conflict mặc định `rename`, `skip` không ghi file và `replace` chỉ overwrite khi explicit. Disk-space contract luôn đánh dấu estimate. Failure/cancel chỉ dọn unpublished generated output và giữ downloaded inputs; success mới dọn input staging. Queue chạy trọn download→processing trên worker, không xử lý trong future callback; processing-only retry tạo attempt `PROCESSING` mới và không gọi downloader. Toàn bộ 274 offline tests chạy xanh, 1 live smoke test deselect; probe thật trên máy phát hiện yt-dlp `2026.08.19` ready, FFmpeg/FFprobe chưa có trên `PATH`, nên FFmpeg behavior được xác nhận bằng fake runner/temp filesystem chứ chưa có live media smoke.
