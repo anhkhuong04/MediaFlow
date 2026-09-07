@@ -14,6 +14,7 @@ from mediaflow.application import (
     DownloadOutcome,
     ProgressSink,
     QueueManager,
+    ShutdownCoordinator,
 )
 from mediaflow.domain import (
     AttemptId,
@@ -180,6 +181,27 @@ def test_one_worker_failure_does_not_stop_following_tasks_or_leak_slots(
     assert queue.active_count == queue.pending_count == 0
     with pytest.raises(RuntimeError, match="shutting down"):
         queue.enqueue(TaskId.new())
+
+
+def test_shutdown_retains_queued_and_interrupts_active_before_bounded_timeout(
+    tmp_path: Path,
+) -> None:
+    repository, tasks = _tasks(tmp_path, count=2)
+    downloader = GatedDownloader(OutputPath(tmp_path / "stream.webm"))
+    queue = _queue(repository, downloader, concurrency=1)
+    queue.enqueue_many(tuple(task.task_id for task in tasks))
+    downloader.wait_for_starts(1)
+
+    report = ShutdownCoordinator(queue, timeout_seconds=0).execute()
+
+    assert not report.clean
+    assert report.interrupted_task_ids == (tasks[0].task_id,)
+    assert report.queued_task_ids == (tasks[1].task_id,)
+    assert repository.get(tasks[0].task_id).state is TaskState.INTERRUPTED  # type: ignore[union-attr]
+    assert repository.get(tasks[1].task_id).state is TaskState.QUEUED  # type: ignore[union-attr]
+    downloader.release.set()
+    assert queue.wait_for_idle(timeout_seconds=5)
+    assert repository.get(tasks[0].task_id).state is TaskState.INTERRUPTED  # type: ignore[union-attr]
 
 
 def _queue(

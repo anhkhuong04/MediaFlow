@@ -25,6 +25,7 @@ from mediaflow.application.format_availability import (
 from mediaflow.application.models import (
     AnalysisOutcome,
     ApplicationSettings,
+    CleanupDisposition,
     ConflictPolicy,
     DependencyComponent,
     DependencyInfo,
@@ -37,6 +38,9 @@ from mediaflow.application.models import (
     PartialFilePolicy,
     ProcessingJob,
     ProcessingOutcome,
+    ResumeMode,
+    ResumePlan,
+    ShutdownReport,
 )
 from mediaflow.application.ports import (
     Analyzer,
@@ -47,19 +51,29 @@ from mediaflow.application.ports import (
     EventPublisher,
     MediaProcessor,
     ProgressSink,
+    RecoveryStore,
     SettingsStore,
     TaskRepository,
     TaskRepositoryConflict,
 )
 from mediaflow.application.processing_manager import ProcessingManager
 from mediaflow.application.queue_manager import QueueManager
+from mediaflow.application.recovery import (
+    PrepareProcessingRetry,
+    PrepareResume,
+    RecoveryReport,
+    RestartDownload,
+    ResumeDownload,
+    ResumeUnavailable,
+    StartupRecovery,
+)
+from mediaflow.application.shutdown import ShutdownCoordinator
 from mediaflow.application.use_cases import (
     AnalyzeUrl,
     CancelDownload,
     EnqueueDownload,
     GetDownloads,
     GetHistory,
-    ResumeDownload,
     RetryDownload,
     TaskNotFound,
 )
@@ -77,6 +91,7 @@ __all__ = [
     "CancellationToken",
     "Clock",
     "ConflictPolicy",
+    "CleanupDisposition",
     "DependencyComponent",
     "DependencyInfo",
     "DependencyProbe",
@@ -104,7 +119,17 @@ __all__ = [
     "ProcessingManager",
     "ProcessingOutcome",
     "QueueManager",
+    "PrepareProcessingRetry",
+    "PrepareResume",
+    "RecoveryReport",
+    "RecoveryStore",
+    "RestartDownload",
+    "ResumeMode",
+    "ResumePlan",
+    "ResumeUnavailable",
     "ResumeDownload",
+    "ShutdownCoordinator",
+    "ShutdownReport",
     "RetryDownload",
     "SettingsStore",
     "TaskFailed",
@@ -114,6 +139,7 @@ __all__ = [
     "TaskRepository",
     "TaskRepositoryConflict",
     "TaskStateChanged",
+    "StartupRecovery",
     "check_preset_availability",
     "require_preset_available",
 ]

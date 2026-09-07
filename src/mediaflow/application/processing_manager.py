@@ -138,6 +138,30 @@ class ProcessingManager:
         )
         return True
 
+    def interrupt(self, task_id: TaskId) -> bool:
+        """Persist processing as recoverable before asking its worker to stop."""
+
+        with self._lock:
+            current = self._repository.get(task_id)
+            if current is None or current.state is not TaskState.PROCESSING:
+                return False
+            signal = self._signals.get(task_id)
+            if signal is not None:
+                signal.cancel()
+            occurred_at = self._clock.now()
+            updated = current.transition(TaskState.INTERRUPTED, at=occurred_at)
+            self._repository.replace(expected=current, updated=updated)
+        self._publish(
+            TaskStateChanged(
+                task_id=task_id,
+                attempt_id=updated.current_attempt.attempt_id,
+                previous_state=TaskState.PROCESSING,
+                state=TaskState.INTERRUPTED,
+                occurred_at=occurred_at,
+            )
+        )
+        return True
+
     def _run(
         self,
         started: DownloadTask,

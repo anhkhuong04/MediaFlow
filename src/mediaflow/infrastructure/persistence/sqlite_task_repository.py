@@ -163,8 +163,8 @@ class SQLiteTaskRepository:
                 INSERT INTO download_attempts(
                     attempt_id, task_id, attempt_number, state, created_at_utc,
                     updated_at_utc, finished_at_utc, failure_category, failure_code,
-                    failure_retryable
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    failure_retryable, interrupted_from
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(attempt.attempt_id),
@@ -177,6 +177,9 @@ class SQLiteTaskRepository:
                     failure.category.value if failure is not None else None,
                     failure.code if failure is not None else None,
                     int(failure.retryable) if failure is not None else None,
+                    attempt.interrupted_from.value
+                    if attempt.interrupted_from is not None
+                    else None,
                 ),
             )
             if attempt.output_path is not None:
@@ -202,7 +205,8 @@ class SQLiteTaskRepository:
             SELECT attempts.attempt_id, attempts.attempt_number, attempts.state,
                    attempts.created_at_utc, attempts.updated_at_utc,
                    attempts.finished_at_utc, attempts.failure_category,
-                   attempts.failure_code, attempts.failure_retryable, outputs.output_path
+                   attempts.failure_code, attempts.failure_retryable, outputs.output_path,
+                   attempts.interrupted_from
             FROM download_attempts AS attempts
             LEFT JOIN task_outputs AS outputs ON outputs.attempt_id = attempts.attempt_id
             WHERE attempts.task_id = ?
@@ -283,6 +287,7 @@ def _deserialize_attempt(row: tuple[object, ...]) -> DownloadAttempt:
         )
     finished_at = cast(str | None, row[5])
     output_path = cast(str | None, row[9])
+    interrupted_from = cast(str | None, row[10])
     return DownloadAttempt(
         attempt_id=AttemptId.parse(cast(str, row[0])),
         number=cast(int, row[1]),
@@ -292,6 +297,7 @@ def _deserialize_attempt(row: tuple[object, ...]) -> DownloadAttempt:
         finished_at=_deserialize_timestamp(finished_at) if finished_at is not None else None,
         failure=failure,
         output_path=OutputPath(Path(output_path)) if output_path is not None else None,
+        interrupted_from=TaskState(interrupted_from) if interrupted_from is not None else None,
     )
 
 
@@ -326,6 +332,7 @@ def _durable_fingerprint(task: DownloadTask) -> tuple[object, ...]:
                 attempt.finished_at,
                 attempt.failure,
                 attempt.output_path,
+                attempt.interrupted_from,
             )
             for attempt in task.attempts
         ),

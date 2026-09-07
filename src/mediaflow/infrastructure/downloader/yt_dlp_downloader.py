@@ -29,6 +29,7 @@ from mediaflow.domain import (
     UtcTimestamp,
 )
 from mediaflow.infrastructure.downloader.format_selection import build_format_selection
+from mediaflow.infrastructure.filesystem.staging_recovery import write_artifact_manifest
 
 _LOGGER = logging.getLogger("mediaflow.download")
 
@@ -186,6 +187,7 @@ class YtDlpDownloader:
                 requires_processing=selection.extract_audio
                 or selection.output_container is not None,
             )
+            write_artifact_manifest(staging_directory, artifact)
             return DownloadOutcome.succeeded(artifact)
         except DownloadCancelled as error:
             failure = _cancelled_failure()

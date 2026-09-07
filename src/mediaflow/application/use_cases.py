@@ -167,29 +167,6 @@ class RetryDownload:
 
 
 @dataclass(frozen=True, slots=True)
-class ResumeDownload:
-    repository: TaskRepository
-    events: EventPublisher
-    clock: Clock
-
-    def execute(self, task_id: TaskId) -> DownloadTask:
-        current = _require_task(self.repository, task_id)
-        occurred_at = self.clock.now()
-        updated = current.transition(TaskState.QUEUED, at=occurred_at)
-        self.repository.replace(expected=current, updated=updated)
-        self.events.publish(_state_event(current, updated, occurred_at))
-        self.events.publish(
-            TaskQueued(
-                task_id=updated.task_id,
-                attempt_id=updated.current_attempt.attempt_id,
-                request=updated.request,
-                occurred_at=occurred_at,
-            )
-        )
-        return updated
-
-
-@dataclass(frozen=True, slots=True)
 class GetDownloads:
     repository: TaskRepository
 

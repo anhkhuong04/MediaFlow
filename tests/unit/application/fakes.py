@@ -5,6 +5,7 @@ from mediaflow.application import (
     ApplicationEvent,
     ApplicationSettings,
     CancellationToken,
+    CleanupDisposition,
     DependencyReport,
     DownloadArtifact,
     DownloadJob,
@@ -153,6 +154,24 @@ class FakeDependencyProbe:
 
     def probe(self) -> DependencyReport:
         return self.report
+
+
+@dataclass(slots=True)
+class FakeRecoveryStore:
+    partial: bool = False
+    artifact: DownloadArtifact | None = None
+    cleanup_calls: list[tuple[DownloadTask, CleanupDisposition]] = field(default_factory=list)
+
+    def has_resumable_partial(self, task: DownloadTask) -> bool:
+        del task
+        return self.partial
+
+    def load_processing_artifact(self, task: DownloadTask) -> DownloadArtifact | None:
+        del task
+        return self.artifact
+
+    def cleanup(self, task: DownloadTask, disposition: CleanupDisposition) -> None:
+        self.cleanup_calls.append((task, disposition))
 
 
 @dataclass(slots=True)

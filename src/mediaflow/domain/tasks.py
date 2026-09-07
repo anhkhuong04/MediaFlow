@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Final
 
-from mediaflow.domain.errors import Failure
+from mediaflow.domain.errors import Failure, FailureCategory
 from mediaflow.domain.identifiers import AttemptId, OutputPath, SourceUrl, TaskId, UtcTimestamp
 from mediaflow.domain.media import DownloadPreset
 from mediaflow.domain.progress import ProgressSnapshot, ProgressStage
@@ -44,7 +44,9 @@ _ALLOWED_TRANSITIONS: Final[dict[TaskState, frozenset[TaskState]]] = {
         }
     ),
     TaskState.PAUSED: frozenset({TaskState.QUEUED, TaskState.INTERRUPTED, TaskState.CANCELLED}),
-    TaskState.INTERRUPTED: frozenset({TaskState.QUEUED, TaskState.FAILED, TaskState.CANCELLED}),
+    TaskState.INTERRUPTED: frozenset(
+        {TaskState.QUEUED, TaskState.PROCESSING, TaskState.FAILED, TaskState.CANCELLED}
+    ),
     TaskState.COMPLETED: frozenset(),
     TaskState.FAILED: frozenset(),
     TaskState.CANCELLED: frozenset(),
@@ -78,6 +80,7 @@ class DownloadAttempt:
     progress: ProgressSnapshot | None = None
     failure: Failure | None = None
     output_path: OutputPath | None = None
+    interrupted_from: TaskState | None = None
 
     def __post_init__(self) -> None:
         if self.number < 1:
@@ -91,6 +94,15 @@ class DownloadAttempt:
             raise ValueError("Only failed attempts must contain a failure")
         if (self.state is TaskState.COMPLETED) != (self.output_path is not None):
             raise ValueError("Only completed attempts must contain a final output path")
+        if (self.state is TaskState.INTERRUPTED) != (self.interrupted_from is not None):
+            raise ValueError("Only interrupted attempts must record their previous state")
+        if self.interrupted_from not in {
+            None,
+            TaskState.DOWNLOADING,
+            TaskState.PROCESSING,
+            TaskState.PAUSED,
+        }:
+            raise ValueError("Interrupted source must be an active or paused state")
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +179,7 @@ class DownloadTask:
             finished_at=at if target in TERMINAL_STATES else None,
             failure=failure,
             output_path=output_path,
+            interrupted_from=current.state if target is TaskState.INTERRUPTED else None,
         )
         return self._replace_current(updated)
 
@@ -231,6 +244,32 @@ class DownloadTask:
             updated_at=at,
         )
         return replace(self, attempts=(*self.attempts, retry_attempt))
+
+    def restart_download(self, *, attempt_id: AttemptId, at: UtcTimestamp) -> "DownloadTask":
+        """Explicitly abandon an unresumable interruption and start a full retry."""
+
+        current = self.current_attempt
+        if current.state is not TaskState.INTERRUPTED:
+            raise InvalidTaskTransition("Only an interrupted task can start a full restart")
+        _require_not_before(at, current.updated_at)
+        if any(attempt.attempt_id == attempt_id for attempt in self.attempts):
+            raise ValueError("Restart attempt ID must be unique")
+        abandoned = replace(
+            current,
+            state=TaskState.FAILED,
+            updated_at=at,
+            finished_at=at,
+            failure=Failure(FailureCategory.DOWNLOAD, "recovery.full_restart", True),
+            interrupted_from=None,
+        )
+        retry_attempt = DownloadAttempt(
+            attempt_id=attempt_id,
+            number=current.number + 1,
+            state=TaskState.QUEUED,
+            created_at=at,
+            updated_at=at,
+        )
+        return replace(self, attempts=(*self.attempts[:-1], abandoned, retry_attempt))
 
     def _replace_current(self, attempt: DownloadAttempt) -> "DownloadTask":
         return replace(self, attempts=(*self.attempts[:-1], attempt))

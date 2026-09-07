@@ -87,6 +87,16 @@ DEFAULT_MIGRATIONS = (
             """,
         ),
     ),
+    Migration(
+        version=3,
+        name="record_interrupted_stage",
+        statements=(
+            """
+            ALTER TABLE download_attempts ADD COLUMN interrupted_from TEXT
+                CHECK (interrupted_from IN ('downloading', 'processing', 'paused'))
+            """,
+        ),
+    ),
 )
 
 

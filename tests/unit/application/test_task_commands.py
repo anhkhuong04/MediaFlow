@@ -8,7 +8,8 @@ from mediaflow.application import (
     CancelDownload,
     GetDownloads,
     GetHistory,
-    ResumeDownload,
+    PrepareResume,
+    ResumeMode,
     RetryDownload,
     TaskNotFound,
     TaskQueued,
@@ -30,6 +31,7 @@ from mediaflow.domain import (
 from tests.unit.application.fakes import (
     CollectingEventPublisher,
     FakeClock,
+    FakeRecoveryStore,
     InMemoryTaskRepository,
 )
 
@@ -95,16 +97,18 @@ def test_retry_creates_new_attempt_and_emits_queued(tmp_path: Path) -> None:
     assert events.events[0].attempt_id == retried.current_attempt.attempt_id
 
 
-@pytest.mark.parametrize("recoverable_state", [TaskState.PAUSED, TaskState.INTERRUPTED])
-def test_resume_requeues_same_attempt(recoverable_state: TaskState, tmp_path: Path) -> None:
+def test_resume_requeues_same_attempt_only_with_real_partial(tmp_path: Path) -> None:
     original = task(tmp_path).transition(TaskState.DOWNLOADING, at=at(2))
-    original = original.transition(recoverable_state, at=at(3))
+    original = original.transition(TaskState.INTERRUPTED, at=at(3))
     repository = InMemoryTaskRepository({original.task_id: original})
     events = CollectingEventPublisher()
 
-    resumed = ResumeDownload(repository, events, FakeClock([at(4)])).execute(original.task_id)
-    assert resumed.state is TaskState.QUEUED
-    assert resumed.current_attempt.attempt_id == original.current_attempt.attempt_id
+    plan = PrepareResume(
+        repository, FakeRecoveryStore(partial=True), events, FakeClock([at(4)])
+    ).execute(original.task_id)
+    assert plan.task.state is TaskState.QUEUED
+    assert plan.mode is ResumeMode.DOWNLOAD
+    assert plan.task.current_attempt.attempt_id == original.current_attempt.attempt_id
     assert [type(event) for event in events.events] == [TaskStateChanged, TaskQueued]
 
 

@@ -46,7 +46,7 @@ def test_database_can_advance_from_each_released_migration(tmp_path: Path) -> No
         outputs_table = connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'task_outputs'"
         ).fetchone()
-    assert versions == [(1,), (2,)]
+    assert versions == [(1,), (2,), (3,)]
     assert outputs_table == ("task_outputs",)
 
 
@@ -102,7 +102,7 @@ def test_database_with_unknown_newer_version_is_rejected(tmp_path: Path) -> None
         connection.execute(
             """
             INSERT INTO schema_migrations(version, name, checksum, applied_at_utc)
-            VALUES (3, 'future_schema', 'unknown', '2026-09-06T00:00:00Z')
+            VALUES (4, 'future_schema', 'unknown', '2026-09-06T00:00:00Z')
             """
         )
 

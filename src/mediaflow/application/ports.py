@@ -11,7 +11,9 @@ from mediaflow.application.events import ApplicationEvent
 from mediaflow.application.models import (
     AnalysisOutcome,
     ApplicationSettings,
+    CleanupDisposition,
     DependencyReport,
+    DownloadArtifact,
     DownloadJob,
     DownloadOutcome,
     ProcessingJob,
@@ -60,6 +62,16 @@ class MediaProcessor(Protocol):
 
 class DependencyProbe(Protocol):
     def probe(self) -> DependencyReport: ...
+
+
+class RecoveryStore(Protocol):
+    """Inspect and clean only app-owned attempt staging data."""
+
+    def has_resumable_partial(self, task: DownloadTask) -> bool: ...
+
+    def load_processing_artifact(self, task: DownloadTask) -> DownloadArtifact | None: ...
+
+    def cleanup(self, task: DownloadTask, disposition: CleanupDisposition) -> None: ...
 
 
 class TaskRepository(Protocol):

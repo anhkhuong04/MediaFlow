@@ -40,7 +40,12 @@ EXPECTED_TRANSITIONS = {
         TaskState.CANCELLED,
     },
     TaskState.PAUSED: {TaskState.QUEUED, TaskState.INTERRUPTED, TaskState.CANCELLED},
-    TaskState.INTERRUPTED: {TaskState.QUEUED, TaskState.FAILED, TaskState.CANCELLED},
+    TaskState.INTERRUPTED: {
+        TaskState.QUEUED,
+        TaskState.PROCESSING,
+        TaskState.FAILED,
+        TaskState.CANCELLED,
+    },
     TaskState.COMPLETED: set(),
     TaskState.FAILED: set(),
     TaskState.CANCELLED: set(),

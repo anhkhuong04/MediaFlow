@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from mediaflow.application import TaskRepository, TaskRepositoryConflict
+from mediaflow.application import StartupRecovery, TaskRepository, TaskRepositoryConflict
 from mediaflow.domain import (
     AttemptId,
     AudioContainer,
@@ -26,6 +26,7 @@ from mediaflow.domain import (
     VideoQuality,
 )
 from mediaflow.infrastructure.persistence import SQLiteTaskRepository
+from tests.unit.application.fakes import CollectingEventPublisher, FakeClock
 
 
 def test_round_trip_preserves_request_attempt_history_failure_and_output(tmp_path: Path) -> None:
@@ -89,6 +90,49 @@ def test_processing_only_retry_attempt_round_trips_without_schema_change(
     repository.add(retried)
 
     assert SQLiteTaskRepository(tmp_path / "mediaflow.db").get(retried.task_id) == retried
+
+
+def test_interrupted_origin_survives_database_reopen(tmp_path: Path) -> None:
+    database_path = tmp_path / "mediaflow.db"
+    repository = SQLiteTaskRepository(database_path)
+    interrupted = (
+        _task(tmp_path)
+        .transition(TaskState.DOWNLOADING, at=_at(1))
+        .transition(TaskState.INTERRUPTED, at=_at(2))
+    )
+    repository.add(interrupted)
+
+    restored = SQLiteTaskRepository(database_path).get(interrupted.task_id)
+
+    assert restored == interrupted
+    assert restored is not None
+    assert restored.current_attempt.interrupted_from is TaskState.DOWNLOADING
+
+
+@pytest.mark.parametrize("stage", [TaskState.DOWNLOADING, TaskState.PROCESSING, TaskState.PAUSED])
+def test_startup_recovery_survives_reopen_at_each_execution_stage(
+    stage: TaskState, tmp_path: Path
+) -> None:
+    database_path = tmp_path / f"{stage.value}.db"
+    repository = SQLiteTaskRepository(database_path)
+    active = _task(tmp_path).transition(TaskState.DOWNLOADING, at=_at(1))
+    if stage is not TaskState.DOWNLOADING:
+        active = active.transition(stage, at=_at(2))
+    repository.add(active)
+
+    reopened = SQLiteTaskRepository(database_path)
+    recovery = StartupRecovery(
+        reopened,
+        CollectingEventPublisher(),
+        FakeClock([_at(3)]),
+    )
+    assert recovery.execute().recovered_task_ids == (active.task_id,)
+    assert recovery.execute().recovered_task_ids == ()
+
+    restored = SQLiteTaskRepository(database_path).get(active.task_id)
+    assert restored is not None
+    assert restored.state is TaskState.INTERRUPTED
+    assert restored.current_attempt.interrupted_from is stage
 
 
 def test_schema_persists_typed_source_but_has_no_auth_payload_columns(tmp_path: Path) -> None:

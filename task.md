@@ -4,7 +4,7 @@
 >
 > **Trạng thái tổng thể:** `IN_PROGRESS`
 >
-> **Giai đoạn hiện tại:** `C6 hoàn thành — tiếp theo C7 (chưa triển khai)`
+> **Giai đoạn hiện tại:** `C7 hoàn thành — tiếp theo C8 (chưa triển khai)`
 >
 > Phạm vi: Core V1 cho Windows Desktop; chưa bao gồm triển khai widget/theme UI.
 
@@ -93,6 +93,9 @@ Không tạo sẵn module rỗng chỉ để khớp cây thư mục. Thư mục 
 | D-014 | Dependency executable do composition root cung cấp; mặc định dùng `PATH` khi development, không tự tải/cập nhật FFmpeg | Probe và processor dùng cùng executable rõ ràng; packaging sau này có thể chọn bundle đã kiểm chứng hoặc đường dẫn do user cấu hình mà không đổi application contract. |
 | D-015 | Queue worker thực thi trọn download → processing; completion callback chỉ thu kết quả và release slot | Loại race khiến callback của future đã hoàn tất có thể chạy trên caller/UI thread; concurrency limit bao phủ cả network, CPU và disk I/O của một task. |
 | D-016 | Final output được tạo ở temporary sibling, FFprobe trước publish, publish atomic và kiểm tra tồn tại/kích thước sau publish | `Completed` chỉ xuất hiện sau output usable; default `rename` và `skip` không overwrite, `replace` chỉ dùng khi explicit. Downloaded staging input chỉ xóa sau success, còn failure/cancel giữ lại cho processing-only retry. |
+| D-017 | `INTERRUPTED` persist cả execution stage trước đó; startup chỉ reconcile `DOWNLOADING`/`PROCESSING`/`PAUSED` và recovery là idempotent | Không để active state giả sau crash và không phải suy đoán download/processing resume từ tên file. |
+| D-018 | Resume download chỉ hợp lệ khi attempt có partial file không rỗng; processing resume/retry chỉ hợp lệ khi manifest và toàn bộ input còn tồn tại | Fallback thiếu dữ liệu trả mã `resume.*_missing`, không âm thầm biến resume thành full retry. Manifest chỉ chứa relative path và normalized stream facts, không chứa URL/raw metadata/secret. |
+| D-019 | Shutdown ngừng admission, giữ task pending ở `QUEUED`, persist task active thành `INTERRUPTED` trước cooperative cancellation và bounded wait | Timeout được trả về bằng report `clean=false`; late worker result không được ghi đè durable interrupted state. Staging chỉ tự xóa theo success policy, còn cancel/failure/interrupted mặc định được giữ. |
 
 C0 chọn CPython 3.13 x64, mypy strict, Ruff và pytest. `pyproject.toml` khai báo
 dependency; `uv.lock` là dữ liệu sinh tự động khóa phiên bản gián tiếp và hash.
@@ -290,13 +293,13 @@ Checkpoint đề xuất: `feat(media): process and finalize downloaded outputs`
 
 Mục tiêu: app đóng/mở lại không báo state sai và không làm mất khả năng phục hồi.
 
-- [ ] **C7.1** Khi startup, reconcile persisted `DOWNLOADING`/`PROCESSING`/`PAUSED` thành state recoverable phù hợp, mặc định `INTERRUPTED`.
-- [ ] **C7.2** Implement retry tạo attempt mới và giữ nguyên request/options cũ.
-- [ ] **C7.3** Implement resume khi yt-dlp/partial file thực sự hỗ trợ; fallback phải rõ ràng và không giả là resume.
-- [ ] **C7.4** Implement processing-only retry cho failure sau download.
-- [ ] **C7.5** Implement shutdown coordinator: ngừng nhận task, yêu cầu cancel, bounded wait và persist state trung thực.
-- [ ] **C7.6** Định nghĩa cleanup policy cho success, cancel, failure và interrupted; không xóa dữ liệu có thể phục hồi ngoài ý muốn.
-- [ ] **C7.7** Viết restart/reopen tests ở từng execution stage và test idempotency của recovery.
+- [x] **C7.1** Khi startup, reconcile persisted `DOWNLOADING`/`PROCESSING`/`PAUSED` thành state recoverable phù hợp, mặc định `INTERRUPTED`.
+- [x] **C7.2** Implement retry tạo attempt mới và giữ nguyên request/options cũ.
+- [x] **C7.3** Implement resume khi yt-dlp/partial file thực sự hỗ trợ; fallback phải rõ ràng và không giả là resume.
+- [x] **C7.4** Implement processing-only retry cho failure sau download.
+- [x] **C7.5** Implement shutdown coordinator: ngừng nhận task, yêu cầu cancel, bounded wait và persist state trung thực.
+- [x] **C7.6** Định nghĩa cleanup policy cho success, cancel, failure và interrupted; không xóa dữ liệu có thể phục hồi ngoài ý muốn.
+- [x] **C7.7** Viết restart/reopen tests ở từng execution stage và test idempotency của recovery.
 
 Acceptance criteria:
 
@@ -403,6 +406,7 @@ Chưa có blocker tại thời điểm lập kế hoạch.
 
 ## 10. Nhật ký tiến độ
 
+- **2026-09-07 — C7 hoàn thành:** Startup recovery reconcile durable `DOWNLOADING`/`PROCESSING`/`PAUSED` sang `INTERRUPTED`, persist execution stage nguồn bằng migration v3 và chạy idempotent khi reopen SQLite. Download resume giữ nguyên attempt và chỉ được chuẩn bị khi staging có partial file không rỗng; nếu thiếu trả mã `resume.partial_missing` thay vì tải lại ngầm. Download adapter ghi manifest atomic chỉ gồm relative artifact paths/stream facts; processing resume và processing-only retry yêu cầu manifest cùng input hợp lệ, giữ nguyên immutable request và attempt history. Queue nhận processing-only work mà không gọi downloader. Shutdown coordinator ngừng nhận task mới, giữ pending task ở `QUEUED`, persist active work thành `INTERRUPTED` trước cooperative cancellation, bounded wait và trả report trung thực khi timeout; late worker không thể ghi đè state phục hồi. Cleanup policy chỉ xóa app-owned attempt staging sau success, mặc định giữ dữ liệu khi cancel/failure/interrupted. Toàn bộ 283 offline tests chạy xanh, 1 live smoke test deselect.
 - **2026-09-07 — C6 hoàn thành:** Thêm dependency report typed cho yt-dlp/FFmpeg/FFprobe và probe version/status; process runner dùng argument tuple với `shell=False`, capture stdout/stderr, timeout, cooperative cancel và reap process. FFmpeg adapter hỗ trợ merge video/audio, remux combined video, M4A/MP3 conversion và copy audio gốc; mọi output được tạo ở temporary sibling, kiểm tra non-empty + FFprobe, publish atomic rồi kiểm tra final file trước khi application commit `COMPLETED`. Filename Windows xử lý invalid/control chars, reserved names, trailing dot/space, collision và path budget; conflict mặc định `rename`, `skip` không ghi file và `replace` chỉ overwrite khi explicit. Disk-space contract luôn đánh dấu estimate. Failure/cancel chỉ dọn unpublished generated output và giữ downloaded inputs; success mới dọn input staging. Queue chạy trọn download→processing trên worker, không xử lý trong future callback; processing-only retry tạo attempt `PROCESSING` mới và không gọi downloader. Toàn bộ 274 offline tests chạy xanh, 1 live smoke test deselect; probe thật trên máy phát hiện yt-dlp `2026.08.19` ready, FFmpeg/FFprobe chưa có trên `PATH`, nên FFmpeg behavior được xác nhận bằng fake runner/temp filesystem chứ chưa có live media smoke.
 - **2026-09-07 — C5 hoàn thành:** Thêm Queue Manager FIFO dùng bounded `ThreadPoolExecutor`, configurable concurrency và lifecycle sở hữu tài nguyên rõ ràng; mọi download chạy trên worker thread, slot được release bằng completion callback cho success/failure/cancel. `DownloadManager` là state owner duy nhất, commit repository trước event, settle cancel/failure/success atomically và chỉ chuyển download thành công sang `PROCESSING`. yt-dlp downloader nhận immutable job/selector, dùng staging riêng theo task/attempt, không overwrite, giữ `.part` khi cancel/failure, không dùng browser cookie, loại DRM và tắt implicit merge để dành processing/final verification cho C6. Raw progress được normalize trung thực, event coalesce 250 ms, durable checkpoint 5 giây và callback/worker failure được cô lập. Stress/FIFO/race/cancel/adapter tests hoàn toàn offline; toàn bộ 236 tests chạy xanh, 1 live smoke test được deselect mặc định.
 - **2026-09-07 — C3 và C4 hoàn thành song song:** SQLite có schema normalized cho task/attempt/output, migration history liên tục có checksum và rollback từng version, repository optimistic theo durable projection, history là projection của terminal task, đồng thời mọi connection được đóng tường minh để không giữ file handle trên Windows. Analyzer yt-dlp dùng option tối thiểu, logger im lặng, cooperative cancellation và per-I/O socket timeout; metadata thiếu/sai kiểu/non-finite, playlist/subtitle/chapter/live được normalize sang model typed. Source URL giữ nguyên ý định người dùng, canonical URL tách riêng, credential-bearing URL bị chặn trước event/persistence. Format availability thuộc application, validate trước enqueue; selector hạ tầng không dùng raw format ID, không fallback resolution/video-only ngầm. Error taxonomy phân biệt unsupported, unavailable, auth, access và network; raw cause chỉ nằm trong diagnostic boundary. Toàn bộ Ruff, mypy strict, dependency checks và 206 offline tests chạy xanh; 1 live smoke test được deselect mặc định.

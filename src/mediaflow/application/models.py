@@ -7,6 +7,7 @@ from mediaflow.domain import (
     AttemptId,
     DownloadPreset,
     DownloadRequest,
+    DownloadTask,
     Failure,
     MediaInfo,
     OutputPath,
@@ -84,6 +85,36 @@ class PartialFilePolicy(StrEnum):
     """C5 keeps partial files so cooperative resume remains possible."""
 
     KEEP = "keep"
+
+
+class ResumeMode(StrEnum):
+    DOWNLOAD = "download"
+    PROCESSING = "processing"
+
+
+class CleanupDisposition(StrEnum):
+    SUCCESS = "success"
+    CANCELLED = "cancelled"
+    FAILURE = "failure"
+    INTERRUPTED = "interrupted"
+
+
+@dataclass(frozen=True, slots=True)
+class ResumePlan:
+    task: DownloadTask
+    mode: ResumeMode
+    artifact: DownloadArtifact | None = None
+
+    def __post_init__(self) -> None:
+        if (self.mode is ResumeMode.PROCESSING) != (self.artifact is not None):
+            raise ValueError("Only a processing resume plan requires an artifact")
+
+
+@dataclass(frozen=True, slots=True)
+class ShutdownReport:
+    clean: bool
+    interrupted_task_ids: tuple[TaskId, ...]
+    queued_task_ids: tuple[TaskId, ...]
 
 
 class ConflictPolicy(StrEnum):

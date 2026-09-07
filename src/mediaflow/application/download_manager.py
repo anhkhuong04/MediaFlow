@@ -167,6 +167,22 @@ class DownloadManager:
         self._publish(event)
         return True
 
+    def interrupt(self, task_id: TaskId) -> bool:
+        """Persist an active download as recoverable, then request worker stop."""
+
+        with self._lock:
+            current = self._repository.get(task_id)
+            if current is None or current.state is not TaskState.DOWNLOADING:
+                return False
+            signal = self._signals.get(task_id)
+            if signal is not None:
+                signal.cancel()
+            occurred_at = self._clock.now()
+            updated = current.transition(TaskState.INTERRUPTED, at=occurred_at)
+            self._repository.replace(expected=current, updated=updated)
+        self._publish_state(current, updated, occurred_at)
+        return True
+
     def _accept_progress(
         self, task_id: TaskId, attempt_id: AttemptId, progress: ProgressSnapshot
     ) -> None:
