@@ -45,6 +45,7 @@ from mediaflow.domain import (
 from mediaflow.presentation.bridge import PresentationCommandRunner, QtEventBridge
 from mediaflow.presentation.controllers import DownloadsController, HomeController, TaskAction
 from mediaflow.presentation.coordinator import PresentationCoordinator
+from mediaflow.presentation.downloads import DownloadsPage
 from mediaflow.presentation.home import HomePage
 from mediaflow.presentation.window import MediaFlowWindow
 
@@ -250,6 +251,33 @@ def test_home_page_keeps_url_explicit_and_exposes_only_normalized_preset_choices
     runner.close()
 
 
+def test_downloads_page_updates_the_existing_card_for_one_task_event(qtbot: object) -> None:
+    task_id = TaskId.new()
+    facade = FakePresentationFacade(items={str(task_id): _item(task_id, "Task", 0.4)})
+    bridge = QtEventBridge(facade, progress_interval_ms=1)
+    runner = PresentationCommandRunner(bridge)
+    controller = DownloadsController(facade, runner)
+    page = DownloadsPage(controller)
+    bridge.command_completed.connect(controller.handle_completion)
+    bridge.application_event.connect(controller.handle_event)
+    bridge.start()
+    _add_widget(qtbot, page)
+    page.show()
+    controller.refresh()
+    _wait_until(qtbot, lambda: str(task_id) in page._cards)
+    original_card = page._cards[str(task_id)]
+
+    facade.items[str(task_id)] = _item(task_id, "Task", None, status=DownloadStatus.PROCESSING)
+    facade.events.publish(_progress_event(task_id, AttemptId.new(), 80, 100, 4))
+    _wait_until(qtbot, lambda: page._cards[str(task_id)]._item.status is DownloadStatus.PROCESSING)
+
+    assert page._cards[str(task_id)] is original_card
+    assert original_card.progress.maximum() == 0
+    assert original_card.open_file.isHidden()
+    bridge.close()
+    runner.close()
+
+
 def test_presentation_layer_does_not_depend_on_infrastructure_modules() -> None:
     presentation_root = Path(__file__).parents[2] / "src" / "mediaflow" / "presentation"
 
@@ -337,7 +365,13 @@ class FakePresentationFacade:
         return CommandResult.succeeded(item)
 
 
-def _item(task_id: TaskId, title: str, fraction: float | None) -> DownloadItemView:
+def _item(
+    task_id: TaskId,
+    title: str,
+    fraction: float | None,
+    *,
+    status: DownloadStatus = DownloadStatus.DOWNLOADING,
+) -> DownloadItemView:
     progress = (
         ProgressView("downloading", fraction, 80, 100, None, None) if fraction is not None else None
     )
@@ -348,7 +382,7 @@ def _item(task_id: TaskId, title: str, fraction: float | None) -> DownloadItemVi
         preset_kind=MediaKind.VIDEO,
         quality="1080p",
         container="mp4",
-        status=DownloadStatus.DOWNLOADING,
+        status=status,
         created_at=_at(0).value,
         updated_at=_at(0).value,
         progress=progress,

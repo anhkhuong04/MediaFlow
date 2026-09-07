@@ -53,6 +53,32 @@ class StringKey(StrEnum):
     QUEUED = "home.queued"
     ERROR_GENERIC_TITLE = "error.generic.title"
     ERROR_GENERIC_BODY = "error.generic.body"
+    DOWNLOADS_TITLE = "downloads.title"
+    ACTIVE = "downloads.active"
+    QUEUED_SECTION = "downloads.queued"
+    RECENTLY_COMPLETED = "downloads.recent"
+    NO_ACTIVE = "downloads.empty_active"
+    NO_QUEUED = "downloads.empty_queued"
+    NO_RECENT = "downloads.empty_recent"
+    OPEN_FILE = "action.open_file"
+    OPEN_FOLDER = "action.open_folder"
+    RETRY = "action.retry"
+    RESUME = "action.resume"
+    RESTART = "action.restart"
+    RETRY_PROCESSING = "action.retry_processing"
+    DETAILS = "action.details"
+    CANCEL_DOWNLOAD_TITLE = "downloads.cancel_title"
+    CANCEL_DOWNLOAD_BODY = "downloads.cancel_body"
+    CANCEL_DOWNLOAD_CONFIRM = "downloads.cancel_confirm"
+    STATUS_WAITING = "status.waiting"
+    STATUS_DOWNLOADING = "status.downloading"
+    STATUS_PROCESSING = "status.processing"
+    STATUS_PAUSED = "status.paused"
+    STATUS_INTERRUPTED = "status.interrupted"
+    STATUS_COMPLETED = "status.completed"
+    STATUS_FAILED = "status.failed"
+    STATUS_CANCELLED = "status.cancelled"
+    UNKNOWN_VALUE = "value.unknown"
 
 
 _ENGLISH: dict[StringKey, str] = {
@@ -96,6 +122,32 @@ _ENGLISH: dict[StringKey, str] = {
     StringKey.QUEUED: "Added to Downloads.",
     StringKey.ERROR_GENERIC_TITLE: "We could not complete that action",
     StringKey.ERROR_GENERIC_BODY: "Check the link or try again.",
+    StringKey.DOWNLOADS_TITLE: "Downloads",
+    StringKey.ACTIVE: "Active",
+    StringKey.QUEUED_SECTION: "Queued",
+    StringKey.RECENTLY_COMPLETED: "Recently completed",
+    StringKey.NO_ACTIVE: "No active downloads.",
+    StringKey.NO_QUEUED: "Nothing is waiting in the queue.",
+    StringKey.NO_RECENT: "Completed, failed, and cancelled downloads will appear here.",
+    StringKey.OPEN_FILE: "Open file",
+    StringKey.OPEN_FOLDER: "Open folder",
+    StringKey.RETRY: "Retry download",
+    StringKey.RESUME: "Resume",
+    StringKey.RESTART: "Restart download",
+    StringKey.RETRY_PROCESSING: "Retry processing",
+    StringKey.DETAILS: "Details",
+    StringKey.CANCEL_DOWNLOAD_TITLE: "Cancel this download?",
+    StringKey.CANCEL_DOWNLOAD_BODY: "Partial download data is kept for recovery when available.",
+    StringKey.CANCEL_DOWNLOAD_CONFIRM: "Cancel download",
+    StringKey.STATUS_WAITING: "Waiting",
+    StringKey.STATUS_DOWNLOADING: "Downloading",
+    StringKey.STATUS_PROCESSING: "Processing",
+    StringKey.STATUS_PAUSED: "Paused",
+    StringKey.STATUS_INTERRUPTED: "Interrupted",
+    StringKey.STATUS_COMPLETED: "Completed",
+    StringKey.STATUS_FAILED: "Failed",
+    StringKey.STATUS_CANCELLED: "Cancelled",
+    StringKey.UNKNOWN_VALUE: "—",
 }
 
 _VIETNAMESE: dict[StringKey, str] = {
