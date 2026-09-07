@@ -1,7 +1,31 @@
-"""Minimal owned top-level window; navigation and screen content start in G1."""
+"""The stable desktop shell and its presentation-only lifecycle concerns."""
 
-from PySide6.QtCore import QObject, QThread
-from PySide6.QtWidgets import QLabel, QMainWindow
+from __future__ import annotations
+
+from collections.abc import Mapping
+
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QThread, QTimer
+from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence, QResizeEvent
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QStackedWidget,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from mediaflow.presentation.design import TOKENS, ShellWidth, ThemeController, ThemeMode
+from mediaflow.presentation.shell import (
+    NavigationDestination,
+    PlaceholderPage,
+    make_navigation_button,
+)
+from mediaflow.presentation.strings import Localizer, StringKey
 
 
 class UiThreadViolation(RuntimeError):
@@ -16,12 +40,240 @@ def assert_ui_thread(owner: QObject) -> None:
 
 
 class MediaFlowWindow(QMainWindow):
-    """A deliberately small shell that gives G0 one owned, testable window."""
+    """Own the reusable app chrome; workflow screens are introduced in later milestones."""
 
-    def __init__(self) -> None:
+    _MINIMUM_WIDTH = 700
+    _MINIMUM_HEIGHT = 500
+    _COMPACT_WIDTH = 900
+    _LARGE_WIDTH = 1200
+    _FULL_SIDEBAR_WIDTH = 232
+    _COMPACT_SIDEBAR_WIDTH = 68
+    _GEOMETRY_KEY = "presentation/window_geometry"
+
+    def __init__(
+        self,
+        *,
+        geometry_store: QSettings | None = None,
+        localizer: Localizer | None = None,
+        theme_controller: ThemeController | None = None,
+    ) -> None:
         super().__init__()
         assert_ui_thread(self)
-        self.setWindowTitle("MediaFlow")
-        self.setMinimumSize(700, 500)
+        self._geometry_store = geometry_store
+        self._localizer = localizer or Localizer()
+        application = QApplication.instance()
+        if theme_controller is None:
+            if not isinstance(application, QApplication):
+                raise RuntimeError("MediaFlowWindow requires an active QApplication")
+            theme_controller = ThemeController(application)
+        self._theme_controller = theme_controller
+        self._navigation_buttons: dict[NavigationDestination, QToolButton] = {}
+        self._pages: dict[NavigationDestination, QWidget] = {}
+        self._shell_width = ShellWidth.STANDARD
+
+        self.setObjectName("mediaflowWindow")
+        self.setWindowTitle(self._localizer.text(StringKey.APP_NAME))
+        self.setMinimumSize(self._MINIMUM_WIDTH, self._MINIMUM_HEIGHT)
         self.resize(1000, 700)
-        self.setCentralWidget(QLabel("MediaFlow", self))
+        self._build_shell()
+        self._restore_geometry()
+        self._apply_shell_width()
+
+    @property
+    def content_stack(self) -> QStackedWidget:
+        """Expose the stack for presentation tests and future screen replacement."""
+
+        return self._content_stack
+
+    @property
+    def current_destination(self) -> NavigationDestination:
+        """Return the selected stable navigation item."""
+
+        return self._current_destination
+
+    @property
+    def shell_width(self) -> ShellWidth:
+        """Return the active responsive shell state."""
+
+        return self._shell_width
+
+    @property
+    def theme_controller(self) -> ThemeController:
+        """Provide the presentation-owned theme controller to future settings UI."""
+
+        return self._theme_controller
+
+    def navigation_button(self, destination: NavigationDestination) -> QToolButton:
+        """Find the one persistent navigation control for a destination."""
+
+        return self._navigation_buttons[destination]
+
+    def navigate(self, destination: NavigationDestination) -> None:
+        """Select an existing page without creating a duplicate screen instance."""
+
+        assert_ui_thread(self)
+        self._current_destination = destination
+        self._content_stack.setCurrentWidget(self._pages[destination])
+        self._navigation_buttons[destination].setChecked(True)
+
+    def go_home(self) -> None:
+        """Implement the global back-to-Home intent used by shell shortcuts."""
+
+        self.navigate(NavigationDestination.HOME)
+
+    def set_theme_mode(self, mode: ThemeMode) -> None:
+        """Change palette without rebuilding the shell or altering selected navigation."""
+
+        self._theme_controller.set_mode(mode)
+
+    def clamp_geometry(self) -> None:
+        """Keep restored geometry visible when a monitor was removed or changed."""
+
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        if screen is None:
+            return
+        available = screen.availableGeometry()
+        width = min(max(self.minimumWidth(), self.width()), available.width())
+        height = min(max(self.minimumHeight(), self.height()), available.height())
+        maximum_x = available.x() + available.width() - width
+        maximum_y = available.y() + available.height() - height
+        x = min(max(self.x(), available.x()), maximum_x)
+        y = min(max(self.y(), available.y()), maximum_y)
+        self.setGeometry(x, y, width, height)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._apply_shell_width()
+
+    def event(self, event: QEvent) -> bool:
+        if event.type() is QEvent.Type.ScreenChangeInternal:
+            QTimer.singleShot(0, self.clamp_geometry)
+        return super().event(event)
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_geometry()
+        super().closeEvent(event)
+
+    def _build_shell(self) -> None:
+        root = QWidget(self)
+        root.setObjectName("shellRoot")
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        self._sidebar = QFrame(root)
+        self._sidebar.setObjectName("sidebar")
+        sidebar_layout = QVBoxLayout(self._sidebar)
+        sidebar_layout.setContentsMargins(
+            TOKENS.spacing.standard,
+            TOKENS.spacing.section,
+            TOKENS.spacing.standard,
+            TOKENS.spacing.standard,
+        )
+        sidebar_layout.setSpacing(TOKENS.spacing.small)
+        self._application_name = QLabel(self._localizer.text(StringKey.APP_NAME), self._sidebar)
+        self._application_name.setObjectName("applicationName")
+        sidebar_layout.addWidget(self._application_name)
+        sidebar_layout.addSpacing(TOKENS.spacing.standard)
+
+        self._content_stack = QStackedWidget(root)
+        self._content_stack.setObjectName("contentArea")
+        self._navigation_group = QButtonGroup(self)
+        self._navigation_group.setExclusive(True)
+        for destination, title_key, description_key in _PAGE_DEFINITIONS:
+            page = PlaceholderPage(
+                title_key=title_key,
+                description_key=description_key,
+                localizer=self._localizer,
+                parent=self._content_stack,
+            )
+            self._pages[destination] = page
+            self._content_stack.addWidget(page)
+            button = make_navigation_button(
+                destination=destination,
+                label_key=title_key,
+                localizer=self._localizer,
+                style=self.style(),
+                parent=self._sidebar,
+            )
+            self._navigation_group.addButton(button)
+            button.clicked.connect(
+                lambda _checked=False, selected=destination: self.navigate(selected)
+            )
+            self._navigation_buttons[destination] = button
+            sidebar_layout.addWidget(button)
+
+        sidebar_layout.addStretch(1)
+        status = QLabel(self._localizer.text(StringKey.SHELL_STATUS_READY), self._sidebar)
+        status.setObjectName("shellStatus")
+        status.setWordWrap(True)
+        status.setAccessibleName(self._localizer.text(StringKey.SHELL_STATUS_READY))
+        sidebar_layout.addWidget(status)
+
+        root_layout.addWidget(self._sidebar)
+        root_layout.addWidget(self._content_stack, 1)
+        self.setCentralWidget(root)
+        self._install_navigation_shortcuts()
+        self.navigate(NavigationDestination.HOME)
+
+    def _install_navigation_shortcuts(self) -> None:
+        shortcuts: Mapping[QKeySequence, NavigationDestination] = {
+            QKeySequence("Ctrl+Home"): NavigationDestination.HOME,
+            QKeySequence("Ctrl+J"): NavigationDestination.DOWNLOADS,
+            QKeySequence("Ctrl+H"): NavigationDestination.HISTORY,
+            QKeySequence("Ctrl+,"): NavigationDestination.SETTINGS,
+        }
+        for shortcut, destination in shortcuts.items():
+            action = QAction(self)
+            action.setShortcut(shortcut)
+            action.setShortcutContext(Qt.ShortcutContext.ApplicationShortcut)
+            action.triggered.connect(
+                lambda _checked=False, selected=destination: self.navigate(selected)
+            )
+            self.addAction(action)
+
+    def _apply_shell_width(self) -> None:
+        width = self.width()
+        shell_width = (
+            ShellWidth.LARGE
+            if width >= self._LARGE_WIDTH
+            else ShellWidth.STANDARD
+            if width >= self._COMPACT_WIDTH
+            else ShellWidth.COMPACT
+        )
+        if shell_width is self._shell_width and self._sidebar.minimumWidth() > 0:
+            return
+        self._shell_width = shell_width
+        compact = shell_width is ShellWidth.COMPACT
+        sidebar_width = self._COMPACT_SIDEBAR_WIDTH if compact else self._FULL_SIDEBAR_WIDTH
+        self._sidebar.setFixedWidth(sidebar_width)
+        self._application_name.setVisible(not compact)
+        for button in self._navigation_buttons.values():
+            button.setToolButtonStyle(
+                Qt.ToolButtonStyle.ToolButtonIconOnly
+                if compact
+                else Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+            )
+            button.setToolTip(button.accessibleName())
+
+    def _restore_geometry(self) -> None:
+        if self._geometry_store is None:
+            return
+        geometry = self._geometry_store.value(self._GEOMETRY_KEY)
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+        self.clamp_geometry()
+
+    def _save_geometry(self) -> None:
+        if self._geometry_store is None:
+            return
+        self._geometry_store.setValue(self._GEOMETRY_KEY, self.saveGeometry())
+        self._geometry_store.sync()
+
+
+_PAGE_DEFINITIONS: tuple[tuple[NavigationDestination, StringKey, StringKey], ...] = (
+    (NavigationDestination.HOME, StringKey.HOME, StringKey.HOME_PLACEHOLDER),
+    (NavigationDestination.DOWNLOADS, StringKey.DOWNLOADS, StringKey.DOWNLOADS_PLACEHOLDER),
+    (NavigationDestination.HISTORY, StringKey.HISTORY, StringKey.HISTORY_PLACEHOLDER),
+    (NavigationDestination.SETTINGS, StringKey.SETTINGS, StringKey.SETTINGS_PLACEHOLDER),
+)

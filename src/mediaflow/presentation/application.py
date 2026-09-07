@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from mediaflow.application import ShutdownReport
@@ -44,11 +45,16 @@ class DesktopRuntime:
         self.window.close()
 
 
-def build_desktop_runtime(config: BootstrapConfig, *, application: QApplication) -> DesktopRuntime:
+def build_desktop_runtime(
+    config: BootstrapConfig,
+    *,
+    application: QApplication,
+    geometry_store: QSettings | None = None,
+) -> DesktopRuntime:
     """Compose the existing core once and expose no infrastructure to widgets."""
 
     return DesktopRuntime(
         application=application,
         core_runtime=build_runtime(config),
-        window=MediaFlowWindow(),
+        window=MediaFlowWindow(geometry_store=geometry_store),
     )

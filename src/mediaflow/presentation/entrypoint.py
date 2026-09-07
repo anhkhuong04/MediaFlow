@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths, Qt
+from PySide6.QtCore import QSettings, QStandardPaths, Qt
 from PySide6.QtWidgets import QApplication
 
 from mediaflow.bootstrap import BootstrapConfig
@@ -46,7 +46,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the desktop shell and always release the core runtime on exit."""
 
     application = create_application(argv)
-    runtime = build_desktop_runtime(default_bootstrap_config(), application=application)
+    runtime = build_desktop_runtime(
+        default_bootstrap_config(),
+        application=application,
+        geometry_store=QSettings(),
+    )
     try:
         runtime.show()
         return application.exec()

@@ -1,12 +1,17 @@
 """Qt presentation bootstrap; screens and application bridges live here."""
 
 from mediaflow.presentation.application import DesktopRuntime, build_desktop_runtime
+from mediaflow.presentation.design import ShellWidth, ThemeMode
 from mediaflow.presentation.entrypoint import create_application, main
+from mediaflow.presentation.shell import NavigationDestination
 from mediaflow.presentation.window import MediaFlowWindow, UiThreadViolation, assert_ui_thread
 
 __all__ = [
     "DesktopRuntime",
     "MediaFlowWindow",
+    "NavigationDestination",
+    "ShellWidth",
+    "ThemeMode",
     "UiThreadViolation",
     "assert_ui_thread",
     "build_desktop_runtime",
