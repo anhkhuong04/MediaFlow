@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QThread, QTimer
+from PySide6.QtCore import QEvent, QObject, QSettings, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QGuiApplication, QKeySequence, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
@@ -49,6 +49,7 @@ class MediaFlowWindow(QMainWindow):
     _FULL_SIDEBAR_WIDTH = 232
     _COMPACT_SIDEBAR_WIDTH = 68
     _GEOMETRY_KEY = "presentation/window_geometry"
+    closed = Signal()
 
     def __init__(
         self,
@@ -152,6 +153,7 @@ class MediaFlowWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_geometry()
+        self.closed.emit()
         super().closeEvent(event)
 
     def _build_shell(self) -> None:

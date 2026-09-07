@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from mediaflow.application import ShutdownReport
 from mediaflow.bootstrap import BootstrapConfig, MediaFlowRuntime, build_runtime
+from mediaflow.presentation.coordinator import PresentationCoordinator
 from mediaflow.presentation.window import MediaFlowWindow
 
 
@@ -17,6 +18,7 @@ class DesktopRuntime:
     application: QApplication
     core_runtime: MediaFlowRuntime
     window: MediaFlowWindow
+    presentation: PresentationCoordinator
     _shutdown_report: ShutdownReport | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -41,6 +43,7 @@ class DesktopRuntime:
         if self.is_shutdown:
             return
         self.application.aboutToQuit.disconnect(self.shutdown)
+        self.presentation.close()
         self._shutdown_report = self.core_runtime.shutdown()
         self.window.close()
 
@@ -53,8 +56,14 @@ def build_desktop_runtime(
 ) -> DesktopRuntime:
     """Compose the existing core once and expose no infrastructure to widgets."""
 
+    core_runtime = build_runtime(config)
+    window = MediaFlowWindow(geometry_store=geometry_store)
+    presentation = PresentationCoordinator(core_runtime.facade)
+    window.closed.connect(presentation.close)
+    presentation.start()
     return DesktopRuntime(
         application=application,
-        core_runtime=build_runtime(config),
-        window=MediaFlowWindow(geometry_store=geometry_store),
+        core_runtime=core_runtime,
+        window=window,
+        presentation=presentation,
     )
