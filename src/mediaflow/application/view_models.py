@@ -160,6 +160,10 @@ class SettingsView:
     default_output_directory: str
     default_preset_id: str
     concurrent_downloads: int
+    default_audio_preset_id: str = "audio.best.original.auto"
+    theme: str = "system"
+    language: str = "en"
+    startup_check_seen: bool = False
 
 
 @dataclass(frozen=True, slots=True)

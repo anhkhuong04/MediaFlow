@@ -33,6 +33,7 @@ from mediaflow.infrastructure.media import (
 )
 from mediaflow.infrastructure.persistence import SQLiteTaskRepository
 from mediaflow.infrastructure.settings import JsonSettingsStore
+from mediaflow.logging_setup import configure_logging, shutdown_logging
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +54,7 @@ class MediaFlowRuntime:
     facade: ApplicationFacade
     shutdown_coordinator: ShutdownCoordinator
     analysis_executor: ThreadPoolExecutor
+    logs_directory: Path
     _closed: bool = False
 
     def shutdown(self) -> ShutdownReport:
@@ -61,7 +63,9 @@ class MediaFlowRuntime:
         self._closed = True
         self.facade.cancel_all_analyses()
         self.analysis_executor.shutdown(wait=True, cancel_futures=True)
-        return self.shutdown_coordinator.execute()
+        report = self.shutdown_coordinator.execute()
+        shutdown_logging()
+        return report
 
     def __enter__(self) -> "MediaFlowRuntime":
         return self
@@ -73,6 +77,8 @@ class MediaFlowRuntime:
 def build_runtime(config: BootstrapConfig) -> MediaFlowRuntime:
     """Construct every concrete adapter without importing presentation code."""
 
+    logs_directory = config.data_directory / "logs"
+    configure_logging(logs_directory)
     defaults = ApplicationSettings(
         default_output_directory=OutputPath(config.default_output_directory),
         default_preset=VideoPreset(),
@@ -132,6 +138,7 @@ def build_runtime(config: BootstrapConfig) -> MediaFlowRuntime:
         facade,
         ShutdownCoordinator(queue, config.shutdown_timeout_seconds),
         analysis_executor,
+        logs_directory,
     )
 
 

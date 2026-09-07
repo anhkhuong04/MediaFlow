@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from mediaflow.application import ApplicationSettings
+from mediaflow.application import (
+    ApplicationSettings,
+    LanguagePreference,
+    ThemePreference,
+)
 from mediaflow.domain import AudioContainer, AudioPreset, OutputPath, VideoPreset
 from mediaflow.infrastructure.settings import JsonSettingsStore
 
@@ -15,6 +19,10 @@ def test_json_settings_round_trip_and_invalid_document_falls_back(tmp_path: Path
         OutputPath((tmp_path / "downloads").resolve()),
         AudioPreset(container=AudioContainer.MP3),
         4,
+        AudioPreset(container=AudioContainer.M4A),
+        ThemePreference.DARK,
+        LanguagePreference.VIETNAMESE,
+        True,
     )
     store.save(changed)
     assert store.load() == changed

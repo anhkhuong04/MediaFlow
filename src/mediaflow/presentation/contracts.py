@@ -7,6 +7,7 @@ from mediaflow.application import (
     AnalysisRequest,
     ApplicationEvent,
     CommandResult,
+    DependencyStatusView,
     DownloadItemView,
     DownloadsView,
     HistoryItemView,
@@ -52,10 +53,17 @@ class PresentationFacade(Protocol):
 
     def load_settings(self) -> SettingsView: ...
 
+    def dependency_status(self) -> tuple[DependencyStatusView, ...]: ...
+
+    def acknowledge_startup_check(self) -> CommandResult[SettingsView]: ...
+
     def save_settings(
         self,
         *,
         default_output_directory: str,
         default_preset_id: str,
         concurrent_downloads: int,
+        default_audio_preset_id: str,
+        theme: str,
+        language: str,
     ) -> CommandResult[SettingsView]: ...

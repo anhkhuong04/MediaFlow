@@ -90,6 +90,38 @@ class StringKey(StrEnum):
     REMOVE_HISTORY_CONFIRM = "history.remove_confirm"
     OUTPUT_DELETE_RESULT = "history.output_delete_result"
     OUTPUT_UNAVAILABLE = "history.output_unavailable"
+    SETTINGS_TITLE = "settings.title"
+    GENERAL = "settings.general"
+    DOWNLOAD_SETTINGS = "settings.downloads"
+    MEDIA_SETTINGS = "settings.media"
+    ADVANCED = "settings.advanced"
+    THEME = "settings.theme"
+    LANGUAGE = "settings.language"
+    THEME_SYSTEM = "settings.theme_system"
+    THEME_LIGHT = "settings.theme_light"
+    THEME_DARK = "settings.theme_dark"
+    LANGUAGE_ENGLISH = "settings.language_english"
+    LANGUAGE_VIETNAMESE = "settings.language_vietnamese"
+    LANGUAGE_RESTART = "settings.language_restart"
+    DEFAULT_FOLDER = "settings.default_folder"
+    DEFAULT_QUALITY = "settings.default_quality"
+    DEFAULT_CONTAINER = "settings.default_container"
+    CONCURRENT_DOWNLOADS = "settings.concurrent_downloads"
+    DEFAULT_AUDIO_OUTPUT = "settings.default_audio_output"
+    SAVE_CHANGES = "action.save_changes"
+    RESET_CHANGES = "action.reset_changes"
+    SETTINGS_SAVED = "settings.saved"
+    DEPENDENCIES = "settings.dependencies"
+    DEPENDENCY_READY = "dependency.ready"
+    DEPENDENCY_UNAVAILABLE = "dependency.unavailable"
+    DEPENDENCY_EFFECT = "dependency.effect"
+    FIRST_RUN_READY_TITLE = "first_run.ready_title"
+    FIRST_RUN_READY_BODY = "first_run.ready_body"
+    FIRST_RUN_ATTENTION_TITLE = "first_run.attention_title"
+    FIRST_RUN_ATTENTION_BODY = "first_run.attention_body"
+    CONTINUE = "action.continue"
+    CONFIGURE = "action.configure"
+    OPEN_LOGS = "action.open_logs"
 
 
 _ENGLISH: dict[StringKey, str] = {
@@ -170,6 +202,40 @@ _ENGLISH: dict[StringKey, str] = {
     StringKey.REMOVE_HISTORY_CONFIRM: "Remove entry",
     StringKey.OUTPUT_DELETE_RESULT: "The downloaded file could not be removed.",
     StringKey.OUTPUT_UNAVAILABLE: "The downloaded file is no longer available.",
+    StringKey.SETTINGS_TITLE: "Settings",
+    StringKey.GENERAL: "General",
+    StringKey.DOWNLOAD_SETTINGS: "Downloads",
+    StringKey.MEDIA_SETTINGS: "Media",
+    StringKey.ADVANCED: "Advanced",
+    StringKey.THEME: "Theme",
+    StringKey.LANGUAGE: "Language",
+    StringKey.THEME_SYSTEM: "System",
+    StringKey.THEME_LIGHT: "Light",
+    StringKey.THEME_DARK: "Dark",
+    StringKey.LANGUAGE_ENGLISH: "English",
+    StringKey.LANGUAGE_VIETNAMESE: "Vietnamese",
+    StringKey.LANGUAGE_RESTART: "Language changes apply the next time you open MediaFlow.",
+    StringKey.DEFAULT_FOLDER: "Default folder",
+    StringKey.DEFAULT_QUALITY: "Default video quality",
+    StringKey.DEFAULT_CONTAINER: "Default video format",
+    StringKey.CONCURRENT_DOWNLOADS: "Concurrent downloads",
+    StringKey.DEFAULT_AUDIO_OUTPUT: "Default audio output",
+    StringKey.SAVE_CHANGES: "Save changes",
+    StringKey.RESET_CHANGES: "Reset changes",
+    StringKey.SETTINGS_SAVED: "Settings saved.",
+    StringKey.DEPENDENCIES: "Dependencies",
+    StringKey.DEPENDENCY_READY: "Ready",
+    StringKey.DEPENDENCY_UNAVAILABLE: "Not available",
+    StringKey.DEPENDENCY_EFFECT: "Some downloads may need media processing.",
+    StringKey.FIRST_RUN_READY_TITLE: "Ready to download",
+    StringKey.FIRST_RUN_READY_BODY: "Paste a media URL to get started.",
+    StringKey.FIRST_RUN_ATTENTION_TITLE: "One component needs attention",
+    StringKey.FIRST_RUN_ATTENTION_BODY: (
+        "FFmpeg was not found. Basic downloads may still work, but merging or conversion can fail."
+    ),
+    StringKey.CONTINUE: "Continue",
+    StringKey.CONFIGURE: "Configure",
+    StringKey.OPEN_LOGS: "Open logs",
 }
 
 _VIETNAMESE: dict[StringKey, str] = {

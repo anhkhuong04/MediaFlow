@@ -52,6 +52,7 @@ class PresentationCoordinator(QObject):
         self.downloads.refresh()
         self.history.refresh()
         self.settings.load()
+        self.settings.load_dependencies()
 
     def close(self) -> None:
         """Stop delivery before joining presentation work and before core infrastructure stops."""

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from mediaflow.application import ApplicationSettings
+from mediaflow.application import ApplicationSettings, LanguagePreference, ThemePreference
 from mediaflow.domain import (
     AudioContainer,
     AudioPreset,
@@ -42,8 +42,22 @@ class JsonSettingsStore:
                 or not isinstance(concurrency, int)
             ):
                 raise ValueError("Settings values have invalid types")
-            return ApplicationSettings(OutputPath(Path(output)), preset, concurrency)
-        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            audio_preset = _deserialize_audio_preset(raw.get("default_audio_preset"))
+            theme = ThemePreference(raw.get("theme", self.defaults.theme.value))
+            language = LanguagePreference(raw.get("language", self.defaults.language.value))
+            startup_check_seen = raw.get("startup_check_seen", self.defaults.startup_check_seen)
+            if not isinstance(startup_check_seen, bool):
+                raise ValueError("Startup check setting has an invalid type")
+            return ApplicationSettings(
+                OutputPath(Path(output)),
+                preset,
+                concurrency,
+                audio_preset,
+                theme,
+                language,
+                startup_check_seen,
+            )
+        except (AttributeError, OSError, TypeError, ValueError, json.JSONDecodeError):
             # Invalid local preferences are not allowed to prevent application
             # startup. Defaults remain authoritative until the next explicit save.
             return self.defaults
@@ -52,10 +66,14 @@ class JsonSettingsStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(f".{self.path.name}.tmp")
         payload = {
-            "version": 1,
+            "version": 2,
             "default_output_directory": str(settings.default_output_directory),
             "default_preset": _serialize_preset(settings.default_preset),
             "concurrent_downloads": settings.concurrent_downloads,
+            "default_audio_preset": _serialize_preset(settings.default_audio_preset),
+            "theme": settings.theme.value,
+            "language": settings.language.value,
+            "startup_check_seen": settings.startup_check_seen,
         }
         try:
             with temporary.open("w", encoding="utf-8", newline="\n") as stream:
@@ -104,3 +122,12 @@ def _deserialize_preset(raw: dict[str, object]) -> VideoPreset | AudioPreset:
             AudioContainer(cast(str, container)),
         )
     raise ValueError("Unknown preset kind")
+
+
+def _deserialize_audio_preset(raw: object) -> AudioPreset:
+    if raw is None:
+        return AudioPreset()
+    preset = _deserialize_preset(cast(dict[str, object], raw))
+    if not isinstance(preset, AudioPreset):
+        raise ValueError("Default audio preset must be an audio preset")
+    return preset

@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from mediaflow.domain import (
     AttemptId,
+    AudioPreset,
     DownloadPreset,
     DownloadRequest,
     DownloadTask,
@@ -15,6 +16,21 @@ from mediaflow.domain import (
     TaskId,
     VideoPreset,
 )
+
+
+class ThemePreference(StrEnum):
+    """Persisted visual preference, independent from the Qt implementation."""
+
+    SYSTEM = "system"
+    LIGHT = "light"
+    DARK = "dark"
+
+
+class LanguagePreference(StrEnum):
+    """Persisted user-interface language choice."""
+
+    ENGLISH = "en"
+    VIETNAMESE = "vi"
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +228,10 @@ class ApplicationSettings:
     default_output_directory: OutputPath
     default_preset: DownloadPreset = VideoPreset()
     concurrent_downloads: int = 2
+    default_audio_preset: AudioPreset = AudioPreset()
+    theme: ThemePreference = ThemePreference.SYSTEM
+    language: LanguagePreference = LanguagePreference.ENGLISH
+    startup_check_seen: bool = False
 
     def __post_init__(self) -> None:
         if self.concurrent_downloads < 1:

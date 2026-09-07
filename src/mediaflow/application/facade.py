@@ -16,7 +16,12 @@ from mediaflow.application.messages import (
     command_message,
     message_for_failure,
 )
-from mediaflow.application.models import ApplicationSettings, ResumeMode
+from mediaflow.application.models import (
+    ApplicationSettings,
+    LanguagePreference,
+    ResumeMode,
+    ThemePreference,
+)
 from mediaflow.application.ports import (
     DependencyProbe,
     EventSource,
@@ -337,6 +342,10 @@ class ApplicationFacade:
             default_output_directory=str(settings.default_output_directory),
             default_preset_id=preset_id(settings.default_preset),
             concurrent_downloads=settings.concurrent_downloads,
+            default_audio_preset_id=preset_id(settings.default_audio_preset),
+            theme=settings.theme.value,
+            language=settings.language.value,
+            startup_check_seen=settings.startup_check_seen,
         )
 
     def save_settings(
@@ -345,19 +354,47 @@ class ApplicationFacade:
         default_output_directory: str,
         default_preset_id: str,
         concurrent_downloads: int,
+        default_audio_preset_id: str = "audio.best.original.auto",
+        theme: str = "system",
+        language: str = "en",
     ) -> CommandResult[SettingsView]:
         preset = _known_presets().get(default_preset_id)
-        if preset is None:
+        audio_preset = _known_audio_presets().get(default_audio_preset_id)
+        if preset is None or audio_preset is None:
             return CommandResult.failed(command_message("error.preset_invalid"))
         try:
             settings = ApplicationSettings(
                 OutputPath(Path(default_output_directory)),
                 preset,
                 concurrent_downloads,
+                audio_preset,
+                ThemePreference(theme),
+                LanguagePreference(language),
+                self._settings.load().startup_check_seen,
             )
             self._settings.save(settings)
             return CommandResult.succeeded(self.load_settings())
         except (OSError, ValueError):
+            return CommandResult.failed(command_message("error.settings_invalid"))
+
+    def acknowledge_startup_check(self) -> CommandResult[SettingsView]:
+        """Persist a non-blocking first-run acknowledgement after user continues."""
+
+        current = self._settings.load()
+        try:
+            self._settings.save(
+                ApplicationSettings(
+                    current.default_output_directory,
+                    current.default_preset,
+                    current.concurrent_downloads,
+                    current.default_audio_preset,
+                    current.theme,
+                    current.language,
+                    True,
+                )
+            )
+            return CommandResult.succeeded(self.load_settings())
+        except OSError:
             return CommandResult.failed(command_message("error.settings_invalid"))
 
     def dependency_status(self) -> tuple[DependencyStatusView, ...]:
@@ -416,3 +453,10 @@ def _known_presets() -> dict[str, DownloadPreset]:
         *(AudioPreset(container=container) for container in AudioContainer),
     )
     return {preset_id(preset): preset for preset in presets}
+
+
+def _known_audio_presets() -> dict[str, AudioPreset]:
+    return {
+        preset_id(preset): preset
+        for preset in (AudioPreset(container=container) for container in AudioContainer)
+    }

@@ -14,6 +14,7 @@ from mediaflow.application import (
     AnalysisRequest,
     ApplicationEvent,
     CommandResult,
+    DependencyStatusView,
     DownloadItemView,
     DownloadStatus,
     DownloadSummaryView,
@@ -48,12 +49,14 @@ from mediaflow.presentation.controllers import (
     DownloadsController,
     HistoryController,
     HomeController,
+    SettingsController,
     TaskAction,
 )
 from mediaflow.presentation.coordinator import PresentationCoordinator
 from mediaflow.presentation.downloads import DownloadsPage
 from mediaflow.presentation.history import HistoryPage
 from mediaflow.presentation.home import HomePage
+from mediaflow.presentation.settings import SettingsPage
 from mediaflow.presentation.window import MediaFlowWindow
 
 
@@ -311,6 +314,65 @@ def test_history_page_fetches_source_only_after_an_explicit_user_action(qtbot: o
     runner.close()
 
 
+def test_settings_page_saves_typed_preferences_without_touching_real_user_settings(
+    qtbot: object,
+) -> None:
+    facade = FakePresentationFacade()
+    bridge = QtEventBridge(facade)
+    runner = PresentationCommandRunner(bridge)
+    controller = SettingsController(facade, runner)
+    page = SettingsPage(controller)
+    bridge.command_completed.connect(controller.handle_completion)
+    bridge.start()
+    _add_widget(qtbot, page)
+    page.show()
+    controller.load()
+    controller.load_dependencies()
+    _wait_until(qtbot, lambda: page._loaded is not None)
+
+    page.folder.setText("C:\\Media")
+    page.theme.setCurrentIndex(page.theme.findData("dark"))
+    page.audio_output.setCurrentIndex(page.audio_output.findData("mp3"))
+    page.concurrency.setValue(4)
+    page.save_button.click()
+
+    _wait_until(qtbot, lambda: not controller.state.save.is_busy)
+    assert controller.state.settings is not None
+    assert controller.state.settings.default_output_directory == "C:\\Media"
+    assert controller.state.settings.default_audio_preset_id == "audio.best.mp3.auto"
+    assert controller.state.settings.theme == "dark"
+    assert controller.state.settings.concurrent_downloads == 4
+    assert not page._dirty
+    bridge.close()
+    runner.close()
+
+
+def test_settings_page_emits_one_non_blocking_first_run_prompt_for_missing_ffmpeg(
+    qtbot: object,
+) -> None:
+    dependency = DependencyStatusView("ffmpeg", "not_found", None, "dependency.ffmpeg.unavailable")
+    facade = FakePresentationFacade(dependencies=(dependency,))
+    bridge = QtEventBridge(facade)
+    runner = PresentationCommandRunner(bridge)
+    controller = SettingsController(facade, runner)
+    page = SettingsPage(controller)
+    bridge.command_completed.connect(controller.handle_completion)
+    bridge.start()
+    _add_widget(qtbot, page)
+    prompted: list[tuple[DependencyStatusView, ...]] = []
+    page.first_run_ready.connect(prompted.append)
+
+    controller.load()
+    controller.load_dependencies()
+    _wait_until(qtbot, lambda: prompted == [(dependency,)])
+    controller.load_dependencies()
+    _wait(qtbot, 20)
+
+    assert prompted == [(dependency,)]
+    bridge.close()
+    runner.close()
+
+
 def test_presentation_layer_does_not_depend_on_infrastructure_modules() -> None:
     presentation_root = Path(__file__).parents[2] / "src" / "mediaflow" / "presentation"
 
@@ -328,10 +390,12 @@ class FakePresentationFacade:
         *,
         items: dict[str, DownloadItemView] | None = None,
         history_items: tuple[HistoryItemView, ...] = (),
+        dependencies: tuple[DependencyStatusView, ...] = (),
     ) -> None:
         self.events = InProcessEventBus()
         self.items = dict(items or {})
         self.history_items = history_items
+        self.dependencies = dependencies
         self.analysis_result: Future[CommandResult[MediaConfigurationView]] = Future()
         self.action_started = Event()
         self.allow_action = Event()
@@ -391,15 +455,31 @@ class FakePresentationFacade:
     def load_settings(self) -> SettingsView:
         return SettingsView("C:\\", "video.1080p.mp4.auto", 2)
 
+    def dependency_status(self) -> tuple[DependencyStatusView, ...]:
+        return self.dependencies
+
+    def acknowledge_startup_check(self) -> CommandResult[SettingsView]:
+        return CommandResult.succeeded(self.load_settings())
+
     def save_settings(
         self,
         *,
         default_output_directory: str,
         default_preset_id: str,
         concurrent_downloads: int,
+        default_audio_preset_id: str,
+        theme: str,
+        language: str,
     ) -> CommandResult[SettingsView]:
         return CommandResult.succeeded(
-            SettingsView(default_output_directory, default_preset_id, concurrent_downloads)
+            SettingsView(
+                default_output_directory,
+                default_preset_id,
+                concurrent_downloads,
+                default_audio_preset_id,
+                theme,
+                language,
+            )
         )
 
     def _action_result(self, task_id: str) -> CommandResult[DownloadItemView]:

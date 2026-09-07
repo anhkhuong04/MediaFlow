@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal
 from mediaflow.application import (
     ApplicationEvent,
     CommandResult,
+    DependencyStatusView,
     DownloadItemView,
     DownloadSummaryView,
     DownloadsView,
@@ -102,6 +103,9 @@ class SettingsState:
     settings: SettingsView | None = None
     load: CommandState = CommandState()
     save: CommandState = CommandState()
+    dependencies: tuple[DependencyStatusView, ...] = ()
+    dependencies_load: CommandState = CommandState()
+    acknowledge: CommandState = CommandState()
 
 
 class HomeController(QObject):
@@ -450,6 +454,8 @@ class SettingsController(QObject):
     state_changed = Signal(object)
     _LOAD = CommandKey("settings", "load")
     _SAVE = CommandKey("settings", "save")
+    _DEPENDENCIES = CommandKey("settings", "dependencies")
+    _ACKNOWLEDGE = CommandKey("settings", "acknowledge_startup")
 
     def __init__(self, facade: PresentationFacade, runner: PresentationCommandRunner) -> None:
         super().__init__()
@@ -474,7 +480,14 @@ class SettingsController(QObject):
         return submitted
 
     def save(
-        self, *, default_output_directory: str, default_preset_id: str, concurrent_downloads: int
+        self,
+        *,
+        default_output_directory: str,
+        default_preset_id: str,
+        concurrent_downloads: int,
+        default_audio_preset_id: str,
+        theme: str,
+        language: str,
     ) -> bool:
         assert_ui_thread(self)
         if self._state.save.is_busy:
@@ -485,6 +498,9 @@ class SettingsController(QObject):
                 default_output_directory=default_output_directory,
                 default_preset_id=default_preset_id,
                 concurrent_downloads=concurrent_downloads,
+                default_audio_preset_id=default_audio_preset_id,
+                theme=theme,
+                language=language,
             ),
         )
         if submitted:
@@ -492,9 +508,44 @@ class SettingsController(QObject):
             self.state_changed.emit(self._state)
         return submitted
 
+    def load_dependencies(self) -> bool:
+        assert_ui_thread(self)
+        if self._state.dependencies_load.is_busy:
+            return False
+        submitted = self._runner.submit(
+            self._DEPENDENCIES,
+            lambda: CommandResult.succeeded(self._facade.dependency_status()),
+        )
+        if submitted:
+            self._state = replace(self._state, dependencies_load=CommandState(is_busy=True))
+            self.state_changed.emit(self._state)
+        return submitted
+
+    def acknowledge_startup_check(self) -> bool:
+        assert_ui_thread(self)
+        if self._state.acknowledge.is_busy:
+            return False
+        submitted = self._runner.submit(self._ACKNOWLEDGE, self._facade.acknowledge_startup_check)
+        if submitted:
+            self._state = replace(self._state, acknowledge=CommandState(is_busy=True))
+            self.state_changed.emit(self._state)
+        return submitted
+
     def handle_completion(self, completion: CommandCompletion) -> None:
         assert_ui_thread(self)
-        if completion.key not in {self._LOAD, self._SAVE}:
+        if completion.key == self._DEPENDENCIES:
+            self._runner.release(completion.key)
+            dependencies = completion.result.value
+            if isinstance(dependencies, tuple) and all(
+                isinstance(item, DependencyStatusView) for item in dependencies
+            ):
+                self._state = replace(self._state, dependencies=dependencies)
+            self._state = replace(
+                self._state, dependencies_load=CommandState(error=completion.result.error)
+            )
+            self.state_changed.emit(self._state)
+            return
+        if completion.key not in {self._LOAD, self._SAVE, self._ACKNOWLEDGE}:
             return
         self._runner.release(completion.key)
         settings = completion.result.value
@@ -502,8 +553,12 @@ class SettingsController(QObject):
             self._state = replace(self._state, settings=settings)
         if completion.key == self._LOAD:
             self._state = replace(self._state, load=CommandState(error=completion.result.error))
-        else:
+        elif completion.key == self._SAVE:
             self._state = replace(self._state, save=CommandState(error=completion.result.error))
+        else:
+            self._state = replace(
+                self._state, acknowledge=CommandState(error=completion.result.error)
+            )
         self.state_changed.emit(self._state)
 
 
