@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QKeySequence, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QAction, QKeySequence, QResizeEvent, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
+    QBoxLayout,
     QButtonGroup,
     QComboBox,
     QFileDialog,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from mediaflow.application import MediaConfigurationView, MediaKind, PresetOptionView
+from mediaflow.presentation.accessibility import complete_control_accessibility, label_control
 from mediaflow.presentation.controllers import HomeController, HomeState
 from mediaflow.presentation.design import TOKENS
 from mediaflow.presentation.strings import Localizer, StringKey
@@ -44,9 +46,11 @@ class HomePage(QScrollArea):
         self._location_was_edited = False
         self._is_dirty = False
         self._enqueue_was_busy = False
+        self._compact_content = False
 
         self.setObjectName("screenScroll")
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget(self)
         self.setWidget(content)
         layout = QVBoxLayout(content)
@@ -75,7 +79,21 @@ class HomePage(QScrollArea):
         self._delayed_timer.setSingleShot(True)
         self._delayed_timer.setInterval(2_000)
         self._delayed_timer.timeout.connect(self._show_delayed_copy)
+        self._configure_keyboard_order()
+        complete_control_accessibility(self)
         self.render_state(self._controller.state)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        compact = self.viewport().width() < 720
+        if compact == self._compact_content:
+            return
+        self._compact_content = compact
+        direction = (
+            QBoxLayout.Direction.TopToBottom if compact else QBoxLayout.Direction.LeftToRight
+        )
+        self._url_row.setDirection(direction)
+        self._location_row.setDirection(direction)
 
     def set_default_output_directory(self, value: str) -> None:
         """Use settings only as a default; it never mutates the global preference."""
@@ -143,7 +161,9 @@ class HomePage(QScrollArea):
                 self.error_label.setVisible(True)
         self._enqueue_was_busy = state.enqueue.is_busy
         self.add_button.setText(
-            self._text(StringKey.ADD_TO_DOWNLOADS) if not state.enqueue.is_busy else "…"
+            self._text(StringKey.ADD_TO_DOWNLOADS)
+            if not state.enqueue.is_busy
+            else self._text(StringKey.WORKING)
         )
         self._refresh_enqueue_enabled(state.enqueue.is_busy)
 
@@ -160,11 +180,13 @@ class HomePage(QScrollArea):
         layout.setSpacing(TOKENS.spacing.small)
         label = QLabel(self._text(StringKey.HOME_URL_LABEL), card)
         layout.addWidget(label)
-        row = QHBoxLayout()
+        row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._url_row = row
         self.url_input = QLineEdit(card)
         self.url_input.setObjectName("homeUrlInput")
         self.url_input.setPlaceholderText(self._text(StringKey.HOME_URL_PLACEHOLDER))
         self.url_input.setClearButtonEnabled(False)
+        label_control(label, self.url_input, description=self._text(StringKey.HOME_URL_PLACEHOLDER))
         self.url_input.textChanged.connect(self._url_changed)
         self.url_input.returnPressed.connect(self._request_analysis)
         row.addWidget(self.url_input, 1)
@@ -247,13 +269,16 @@ class HomePage(QScrollArea):
         layout.addWidget(self.conversion_notice)
         location_label = QLabel(self._text(StringKey.OUTPUT_LOCATION), self.configuration_card)
         layout.addWidget(location_label)
-        location_row = QHBoxLayout()
+        location_row = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self._location_row = location_row
         self.output_directory = QLineEdit(self.configuration_card)
         self.output_directory.textChanged.connect(self._location_changed)
         location_row.addWidget(self.output_directory, 1)
-        choose = QPushButton(self._text(StringKey.CHOOSE_FOLDER), self.configuration_card)
-        choose.clicked.connect(self._choose_directory)
-        location_row.addWidget(choose)
+        self.choose_directory_button = QPushButton(
+            self._text(StringKey.CHOOSE_FOLDER), self.configuration_card
+        )
+        self.choose_directory_button.clicked.connect(self._choose_directory)
+        location_row.addWidget(self.choose_directory_button)
         layout.addLayout(location_row)
         self.advanced_button = QToolButton(self.configuration_card)
         self.advanced_button.setText(self._text(StringKey.ADVANCED_OPTIONS))
@@ -277,6 +302,19 @@ class HomePage(QScrollArea):
         layout.addWidget(self.add_button, alignment=Qt.AlignmentFlag.AlignLeft)
         self.configuration_card.setVisible(False)
         return self.configuration_card
+
+    def _configure_keyboard_order(self) -> None:
+        QWidget.setTabOrder(self.url_input, self.paste_button)
+        QWidget.setTabOrder(self.paste_button, self.clear_button)
+        QWidget.setTabOrder(self.clear_button, self.analyze_button)
+        QWidget.setTabOrder(self.analyze_button, self.cancel_button)
+        QWidget.setTabOrder(self.cancel_button, self.video_button)
+        QWidget.setTabOrder(self.video_button, self.audio_button)
+        QWidget.setTabOrder(self.audio_button, self.preset_combo)
+        QWidget.setTabOrder(self.preset_combo, self.output_directory)
+        QWidget.setTabOrder(self.output_directory, self.choose_directory_button)
+        QWidget.setTabOrder(self.choose_directory_button, self.advanced_button)
+        QWidget.setTabOrder(self.advanced_button, self.add_button)
 
     def _request_analysis(self) -> None:
         url = self.url_input.text().strip()

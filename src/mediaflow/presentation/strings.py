@@ -150,6 +150,11 @@ class StringKey(StrEnum):
     TRAY_EXIT = "tray.exit"
     NOTIFICATION_COMPLETED_TITLE = "notification.completed_title"
     NOTIFICATION_FAILED_TITLE = "notification.failed_title"
+    WORKING = "status.working"
+    QUALITY_BEST = "quality.best"
+    AUDIO_ORIGINAL = "audio.original"
+    ETA = "time.eta"
+    STATUS_ANNOUNCEMENT = "status.announcement"
 
 
 _ENGLISH: dict[StringKey, str] = {
@@ -301,6 +306,11 @@ _ENGLISH: dict[StringKey, str] = {
     StringKey.TRAY_EXIT: "Exit",
     StringKey.NOTIFICATION_COMPLETED_TITLE: "Download completed",
     StringKey.NOTIFICATION_FAILED_TITLE: "Download failed",
+    StringKey.WORKING: "Working…",
+    StringKey.QUALITY_BEST: "Best",
+    StringKey.AUDIO_ORIGINAL: "Original",
+    StringKey.ETA: "ETA {value}",
+    StringKey.STATUS_ANNOUNCEMENT: "{title}: {status}",
 }
 
 _VIETNAMESE: dict[StringKey, str] = {
@@ -327,6 +337,138 @@ _VIETNAMESE: dict[StringKey, str] = {
     StringKey.SHELL_STATUS_READY: "Khung ứng dụng đã sẵn sàng",
 }
 
+# Keep the Vietnamese catalog complete instead of depending on English fallback for V1 flows.
+_VIETNAMESE.update(
+    {
+        StringKey.HOME_URL_LABEL: "URL media",
+        StringKey.HOME_URL_PLACEHOLDER: "Dán URL video, audio hoặc playlist",
+        StringKey.ADVANCED_OPTIONS: "Tùy chọn nâng cao",
+        StringKey.ADVANCED_UNAVAILABLE: "Chưa có tùy chọn bổ sung cho định dạng này.",
+        StringKey.ANALYZING: "Đang phân tích liên kết…",
+        StringKey.ANALYZING_DELAYED: "Việc này mất lâu hơn bình thường. Bạn có thể hủy an toàn.",
+        StringKey.ANALYSIS_READY: "Chọn định dạng rồi thêm vào Tải xuống.",
+        StringKey.CONVERSION_REQUIRED: "Tùy chọn này cần chuyển đổi media sau khi tải.",
+        StringKey.PRESET_LABEL: "Định dạng",
+        StringKey.METADATA_UNAVAILABLE: "Một số chi tiết media không khả dụng.",
+        StringKey.PRESET_UNAVAILABLE: "Không khả dụng cho media này",
+        StringKey.URL_REQUIRED: "Nhập URL media để tiếp tục.",
+        StringKey.OUTPUT_REQUIRED: "Chọn thư mục cho lượt tải này.",
+        StringKey.NEW_URL_TITLE: "Phân tích liên kết mới?",
+        StringKey.NEW_URL_BODY: "Các lựa chọn tải hiện tại chưa được thêm.",
+        StringKey.ANALYZE_NEW: "Phân tích liên kết mới",
+        StringKey.KEEP_CURRENT: "Giữ lựa chọn hiện tại",
+        StringKey.ERROR_GENERIC_TITLE: "Không thể hoàn tất thao tác",
+        StringKey.ERROR_GENERIC_BODY: "Kiểm tra liên kết hoặc thử lại.",
+        StringKey.ACTIVE: "Đang hoạt động",
+        StringKey.QUEUED_SECTION: "Đang chờ",
+        StringKey.RECENTLY_COMPLETED: "Hoàn tất gần đây",
+        StringKey.NO_ACTIVE: "Không có lượt tải đang hoạt động.",
+        StringKey.NO_QUEUED: "Không có lượt tải nào đang chờ.",
+        StringKey.NO_RECENT: "Lượt tải hoàn tất, lỗi hoặc đã hủy sẽ xuất hiện ở đây.",
+        StringKey.OPEN_FILE: "Mở tệp",
+        StringKey.OPEN_FOLDER: "Mở thư mục",
+        StringKey.RETRY: "Tải lại",
+        StringKey.RESUME: "Tiếp tục",
+        StringKey.RESTART: "Tải lại từ đầu",
+        StringKey.RETRY_PROCESSING: "Thử xử lý lại",
+        StringKey.DETAILS: "Chi tiết",
+        StringKey.CANCEL_DOWNLOAD_TITLE: "Hủy lượt tải này?",
+        StringKey.CANCEL_DOWNLOAD_BODY: "Dữ liệu tải dở được giữ lại để khôi phục khi có thể.",
+        StringKey.CANCEL_DOWNLOAD_CONFIRM: "Hủy lượt tải",
+        StringKey.STATUS_WAITING: "Đang chờ",
+        StringKey.STATUS_DOWNLOADING: "Đang tải",
+        StringKey.STATUS_PROCESSING: "Đang xử lý",
+        StringKey.STATUS_PAUSED: "Đã tạm dừng",
+        StringKey.STATUS_INTERRUPTED: "Bị gián đoạn",
+        StringKey.STATUS_COMPLETED: "Hoàn tất",
+        StringKey.STATUS_FAILED: "Thất bại",
+        StringKey.STATUS_CANCELLED: "Đã hủy",
+        StringKey.HISTORY_EMPTY: "Chưa có lượt tải hoàn tất, lỗi hoặc đã hủy.",
+        StringKey.DOWNLOAD_AGAIN: "Tải lại",
+        StringKey.COPY_SOURCE_URL: "Sao chép URL nguồn",
+        StringKey.REMOVE_HISTORY: "Xóa khỏi lịch sử",
+        StringKey.DELETE_OUTPUT: "Cũng xóa tệp đã tải",
+        StringKey.REMOVE_HISTORY_TITLE: "Xóa mục lịch sử này?",
+        StringKey.REMOVE_HISTORY_BODY: "Thao tác này chỉ xóa bản ghi khỏi MediaFlow.",
+        StringKey.REMOVE_HISTORY_CONFIRM: "Xóa mục",
+        StringKey.OUTPUT_DELETE_RESULT: "Không thể xóa tệp đã tải.",
+        StringKey.OUTPUT_UNAVAILABLE: "Tệp đã tải không còn khả dụng.",
+        StringKey.GENERAL: "Chung",
+        StringKey.DOWNLOAD_SETTINGS: "Tải xuống",
+        StringKey.MEDIA_SETTINGS: "Media",
+        StringKey.ADVANCED: "Nâng cao",
+        StringKey.THEME: "Giao diện",
+        StringKey.LANGUAGE: "Ngôn ngữ",
+        StringKey.THEME_SYSTEM: "Theo hệ thống",
+        StringKey.THEME_LIGHT: "Sáng",
+        StringKey.THEME_DARK: "Tối",
+        StringKey.LANGUAGE_VIETNAMESE: "Tiếng Việt",
+        StringKey.LANGUAGE_RESTART: "Ngôn ngữ mới được áp dụng khi mở lại MediaFlow.",
+        StringKey.DEFAULT_FOLDER: "Thư mục mặc định",
+        StringKey.DEFAULT_QUALITY: "Chất lượng video mặc định",
+        StringKey.DEFAULT_CONTAINER: "Định dạng video mặc định",
+        StringKey.CONCURRENT_DOWNLOADS: "Số lượt tải đồng thời",
+        StringKey.DEFAULT_AUDIO_OUTPUT: "Đầu ra âm thanh mặc định",
+        StringKey.SAVE_CHANGES: "Lưu thay đổi",
+        StringKey.RESET_CHANGES: "Đặt lại thay đổi",
+        StringKey.SETTINGS_SAVED: "Đã lưu cài đặt.",
+        StringKey.DEPENDENCIES: "Thành phần phụ thuộc",
+        StringKey.DEPENDENCY_READY: "Sẵn sàng",
+        StringKey.DEPENDENCY_UNAVAILABLE: "Không khả dụng",
+        StringKey.DEPENDENCY_EFFECT: "Một số lượt tải có thể cần xử lý media.",
+        StringKey.FIRST_RUN_READY_TITLE: "Sẵn sàng tải",
+        StringKey.FIRST_RUN_READY_BODY: "Dán URL media để bắt đầu.",
+        StringKey.FIRST_RUN_ATTENTION_TITLE: "Một thành phần cần chú ý",
+        StringKey.FIRST_RUN_ATTENTION_BODY: (
+            "Không tìm thấy FFmpeg. Tải cơ bản vẫn có thể hoạt động, "
+            "nhưng ghép hoặc chuyển đổi có thể lỗi."
+        ),
+        StringKey.CONTINUE: "Tiếp tục",
+        StringKey.CONFIGURE: "Cấu hình",
+        StringKey.OPEN_LOGS: "Mở nhật ký",
+        StringKey.COPY_DIAGNOSTICS: "Sao chép chẩn đoán",
+        StringKey.ERROR_DETAILS_TITLE: "Chi tiết lỗi",
+        StringKey.DIAGNOSTICS_TASK_ID: "ID tác vụ",
+        StringKey.DIAGNOSTICS_SOURCE: "Nguồn",
+        StringKey.DIAGNOSTICS_STAGE: "Giai đoạn",
+        StringKey.DIAGNOSTICS_MESSAGE_KEY: "Khóa thông báo",
+        StringKey.DIAGNOSTICS_TECHNICAL_DETAIL: "Chi tiết kỹ thuật",
+        StringKey.DIAGNOSTICS_TIMESTAMP: "Thời điểm",
+        StringKey.CONFLICT_TITLE: "Xung đột tệp đầu ra",
+        StringKey.CONFLICT_BODY: "Đã tồn tại tệp cùng tên. Chọn cách tiếp tục.",
+        StringKey.RENAME: "Đổi tên",
+        StringKey.SKIP: "Bỏ qua",
+        StringKey.REPLACE: "Thay thế",
+        StringKey.DISK_SPACE_TITLE: "Không đủ dung lượng đĩa",
+        StringKey.DISK_SPACE_BODY: (
+            "Lượt tải này có thể cần khoảng {required}; hiện có khoảng {available}."
+        ),
+        StringKey.CHOOSE_ANOTHER_FOLDER: "Chọn thư mục khác",
+        StringKey.CLOSE_ACTIVE_TITLE: "Lượt tải vẫn đang hoạt động",
+        StringKey.CLOSE_ACTIVE_BODY: (
+            "Giữ MediaFlow chạy trong khay hệ thống hoặc dừng để thoát. "
+            "Công việc bị dừng được ghi là Bị gián đoạn."
+        ),
+        StringKey.CONTINUE_IN_TRAY: "Tiếp tục trong khay hệ thống",
+        StringKey.STOP_AND_EXIT: "Dừng và thoát",
+        StringKey.SHUTTING_DOWN: "Đang dừng công việc an toàn…",
+        StringKey.SHUTDOWN_TIMEOUT_TITLE: "MediaFlow vẫn đang dừng công việc",
+        StringKey.SHUTDOWN_TIMEOUT_BODY: (
+            "Đã hết thời gian chờ tắt. MediaFlow vẫn mở; không worker nào bị buộc dừng."
+        ),
+        StringKey.TRAY_ACTIVE_COUNT: "{count} lượt tải đang hoạt động",
+        StringKey.TRAY_OPEN: "Mở MediaFlow",
+        StringKey.TRAY_EXIT: "Thoát",
+        StringKey.NOTIFICATION_COMPLETED_TITLE: "Tải xuống hoàn tất",
+        StringKey.NOTIFICATION_FAILED_TITLE: "Tải xuống thất bại",
+        StringKey.WORKING: "Đang xử lý…",
+        StringKey.QUALITY_BEST: "Tốt nhất",
+        StringKey.AUDIO_ORIGINAL: "Gốc",
+        StringKey.ETA: "Còn lại {value}",
+        StringKey.STATUS_ANNOUNCEMENT: "{title}: {status}",
+    }
+)
+
 _TRANSLATIONS: dict[Language, dict[StringKey, str]] = {
     Language.ENGLISH: _ENGLISH,
     Language.VIETNAMESE: _VIETNAMESE,
@@ -343,5 +485,11 @@ class Localizer:
     def language(self) -> Language:
         return self._language
 
-    def text(self, key: StringKey) -> str:
-        return _TRANSLATIONS[self._language][key]
+    def text(self, key: StringKey | str) -> str:
+        """Return a visible fallback for a missing key instead of raising from a widget."""
+
+        try:
+            typed_key = key if isinstance(key, StringKey) else StringKey(key)
+        except ValueError:
+            return f"[{key}]"
+        return _TRANSLATIONS[self._language].get(typed_key, _ENGLISH[typed_key])

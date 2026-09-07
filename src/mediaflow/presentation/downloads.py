@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFocusEvent
+from PySide6.QtGui import QFocusEvent, QResizeEvent
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QProgressBar,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from mediaflow.application import DownloadItemView, DownloadStatus, ProgressView, TaskDetailsView
+from mediaflow.presentation.accessibility import complete_control_accessibility
 from mediaflow.presentation.controllers import DownloadsController, DownloadsState, TaskAction
 from mediaflow.presentation.design import TOKENS
 from mediaflow.presentation.diagnostics import ErrorDetailsDialog, details_for_task
@@ -42,8 +43,10 @@ class DownloadsPage(QScrollArea):
         self._cards: dict[str, DownloadCard] = {}
         self._pending_details: set[str] = set()
         self._detail_dialogs: dict[str, ErrorDetailsDialog] = {}
+        self._last_status_by_task_id: dict[str, DownloadStatus] = {}
         self.setObjectName("screenScroll")
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget(self)
         self.setWidget(content)
         layout = QVBoxLayout(content)
@@ -60,6 +63,11 @@ class DownloadsPage(QScrollArea):
         self.summary = QLabel(content)
         self.summary.setObjectName("secondaryText")
         layout.addWidget(self.summary)
+        self.status_announcement = QLabel(content)
+        self.status_announcement.setObjectName("screenReaderStatus")
+        self.status_announcement.setWordWrap(True)
+        self.status_announcement.setVisible(False)
+        layout.addWidget(self.status_announcement)
         self._sections = {
             "active": _TaskSection(
                 self._text(StringKey.ACTIVE), self._text(StringKey.NO_ACTIVE), content
@@ -75,6 +83,7 @@ class DownloadsPage(QScrollArea):
             layout.addWidget(section)
         layout.addStretch(1)
         self._controller.state_changed.connect(self.render_state)
+        complete_control_accessibility(self)
         self.render_state(self._controller.state)
 
     def render_state(self, state: DownloadsState) -> None:
@@ -99,6 +108,7 @@ class DownloadsPage(QScrollArea):
             else:
                 card.update_item(item)
             card.set_selected(item.task_id == state.selected_task_id)
+            self._announce_terminal_transition(item)
 
         current_ids = {item.task_id for item in state.items}
         for task_id, card in tuple(self._cards.items()):
@@ -147,6 +157,29 @@ class DownloadsPage(QScrollArea):
 
     def _text(self, key: StringKey) -> str:
         return self._localizer.text(key)
+
+    def _announce_terminal_transition(self, item: DownloadItemView) -> None:
+        previous = self._last_status_by_task_id.get(item.task_id)
+        self._last_status_by_task_id[item.task_id] = item.status
+        if (
+            previous is None
+            or previous is item.status
+            or item.status
+            not in {
+                DownloadStatus.COMPLETED,
+                DownloadStatus.FAILED,
+                DownloadStatus.CANCELLED,
+                DownloadStatus.INTERRUPTED,
+            }
+        ):
+            return
+        message = self._text(StringKey.STATUS_ANNOUNCEMENT).format(
+            title=item.title, status=_status_text(item.status, self._localizer)
+        )
+        self.status_announcement.setText(message)
+        self.status_announcement.setAccessibleName(message)
+        self.status_announcement.setAccessibleDescription(message)
+        self.status_announcement.setVisible(True)
 
 
 class _TaskSection(QFrame):
@@ -200,6 +233,7 @@ class DownloadCard(QFrame):
         self._output_launcher = output_launcher
         self.setObjectName("downloadCard")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self._compact_actions = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
             TOKENS.spacing.compact,
@@ -228,7 +262,7 @@ class DownloadCard(QFrame):
         self.failure.setObjectName("errorText")
         self.failure.setWordWrap(True)
         layout.addWidget(self.failure)
-        self.actions_layout = QHBoxLayout()
+        self.actions_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         self.actions_layout.setSpacing(TOKENS.spacing.small)
         layout.addLayout(self.actions_layout)
         self._buttons = {
@@ -254,7 +288,17 @@ class DownloadCard(QFrame):
         self.details_button.clicked.connect(lambda: self.details_requested.emit(self._item.task_id))
         self.actions_layout.addWidget(self.details_button)
         self.actions_layout.addStretch(1)
+        complete_control_accessibility(self)
         self.update_item(item)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        compact = self.width() < 620
+        if compact != self._compact_actions:
+            self._compact_actions = compact
+            self.actions_layout.setDirection(
+                QBoxLayout.Direction.TopToBottom if compact else QBoxLayout.Direction.LeftToRight
+            )
 
     def focusInEvent(self, event: QFocusEvent) -> None:
         super().focusInEvent(event)
@@ -262,6 +306,8 @@ class DownloadCard(QFrame):
 
     def set_selected(self, selected: bool) -> None:
         self.setProperty("selectedTask", selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
     def update_item(self, item: DownloadItemView) -> None:
         self._item = item
@@ -400,4 +446,4 @@ def _eta_text(value: float | None, localizer: Localizer) -> str:
         return localizer.text(StringKey.UNKNOWN_VALUE)
     seconds = max(0, round(value))
     minutes, seconds = divmod(seconds, 60)
-    return f"ETA {minutes}:{seconds:02d}"
+    return localizer.text(StringKey.ETA).format(value=f"{minutes}:{seconds:02d}")

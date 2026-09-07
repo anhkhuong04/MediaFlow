@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QBoxLayout,
     QCheckBox,
     QFrame,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from mediaflow.application import HistoryItemView, TaskDetailsView
+from mediaflow.presentation.accessibility import complete_control_accessibility
 from mediaflow.presentation.controllers import HistoryController, HistoryState
 from mediaflow.presentation.design import TOKENS
 from mediaflow.presentation.downloads import _status_text
@@ -46,6 +48,7 @@ class HistoryPage(QScrollArea):
         self._shown_removal_result: tuple[str, bool] | None = None
         self.setObjectName("screenScroll")
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget(self)
         self.setWidget(content)
         layout = QVBoxLayout(content)
@@ -71,6 +74,7 @@ class HistoryPage(QScrollArea):
         layout.addWidget(self.notice)
         layout.addStretch(1)
         self._controller.state_changed.connect(self.render_state)
+        complete_control_accessibility(self)
         self.render_state(self._controller.state)
 
     def render_state(self, state: HistoryState) -> None:
@@ -162,6 +166,7 @@ class HistoryCard(QFrame):
         self._localizer = localizer
         self._output_launcher = output_launcher
         self.setObjectName("downloadCard")
+        self._compact_actions = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
             TOKENS.spacing.compact,
@@ -180,7 +185,8 @@ class HistoryCard(QFrame):
         self.output_status = QLabel(self)
         self.output_status.setObjectName("helperText")
         layout.addWidget(self.output_status)
-        actions = QHBoxLayout()
+        actions = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.actions_layout = actions
         actions.setSpacing(TOKENS.spacing.small)
         layout.addLayout(actions)
         self.open_file = QPushButton(self._text(StringKey.OPEN_FILE), self)
@@ -199,7 +205,17 @@ class HistoryCard(QFrame):
         self.remove_button.clicked.connect(self._confirm_remove)
         actions.addWidget(self.remove_button)
         actions.addStretch(1)
+        complete_control_accessibility(self)
         self.update_item(item)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        compact = self.width() < 620
+        if compact != self._compact_actions:
+            self._compact_actions = compact
+            self.actions_layout.setDirection(
+                QBoxLayout.Direction.TopToBottom if compact else QBoxLayout.Direction.LeftToRight
+            )
 
     def update_item(self, item: HistoryItemView) -> None:
         self._item = item

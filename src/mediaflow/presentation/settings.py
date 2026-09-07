@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QUrl, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from mediaflow.application import DependencyStatusView, SettingsView
+from mediaflow.presentation.accessibility import complete_control_accessibility
 from mediaflow.presentation.controllers import SettingsController, SettingsState
 from mediaflow.presentation.design import TOKENS
 from mediaflow.presentation.strings import Localizer, StringKey
@@ -55,6 +56,7 @@ class SettingsPage(QScrollArea):
         self._first_run_presented = False
         self.setObjectName("screenScroll")
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget(self)
         self.setWidget(content)
         layout = QVBoxLayout(content)
@@ -92,6 +94,7 @@ class SettingsPage(QScrollArea):
         layout.addLayout(actions)
         layout.addStretch(1)
         self._controller.state_changed.connect(self.render_state)
+        self._configure_accessibility()
         self.render_state(self._controller.state)
 
     def render_state(self, state: SettingsState) -> None:
@@ -123,6 +126,7 @@ class SettingsPage(QScrollArea):
     def _general_section(self, parent: QWidget) -> QFrame:
         card, form = _section(self._text(StringKey.GENERAL), parent)
         self.theme = QComboBox(card)
+        self.theme.setAccessibleName(self._text(StringKey.THEME))
         self._add_options(
             self.theme,
             (
@@ -132,6 +136,7 @@ class SettingsPage(QScrollArea):
             ),
         )
         self.language = QComboBox(card)
+        self.language.setAccessibleName(self._text(StringKey.LANGUAGE))
         self._add_options(
             self.language,
             (
@@ -153,6 +158,7 @@ class SettingsPage(QScrollArea):
         card, form = _section(self._text(StringKey.DOWNLOAD_SETTINGS), parent)
         folder_row = QHBoxLayout()
         self.folder = QLineEdit(card)
+        self.folder.setAccessibleName(self._text(StringKey.DEFAULT_FOLDER))
         self.folder.textChanged.connect(self._changed)
         folder_row.addWidget(self.folder, 1)
         choose = QPushButton(self._text(StringKey.CHOOSE_FOLDER), card)
@@ -161,10 +167,11 @@ class SettingsPage(QScrollArea):
         folder_holder = QWidget(card)
         folder_holder.setLayout(folder_row)
         self.video_quality = QComboBox(card)
+        self.video_quality.setAccessibleName(self._text(StringKey.DEFAULT_QUALITY))
         self._add_options(
             self.video_quality,
             (
-                ("Best", "best"),
+                (self._text(StringKey.QUALITY_BEST), "best"),
                 ("2160p", "2160p"),
                 ("1440p", "1440p"),
                 ("1080p", "1080p"),
@@ -172,8 +179,10 @@ class SettingsPage(QScrollArea):
             ),
         )
         self.video_container = QComboBox(card)
+        self.video_container.setAccessibleName(self._text(StringKey.DEFAULT_CONTAINER))
         self._add_options(self.video_container, (("MP4", "mp4"), ("MKV", "mkv")))
         self.concurrency = QSpinBox(card)
+        self.concurrency.setAccessibleName(self._text(StringKey.CONCURRENT_DOWNLOADS))
         self.concurrency.setRange(1, 8)
         form.addRow(self._text(StringKey.DEFAULT_FOLDER), folder_holder)
         form.addRow(self._text(StringKey.DEFAULT_QUALITY), self.video_quality)
@@ -187,13 +196,26 @@ class SettingsPage(QScrollArea):
     def _media_section(self, parent: QWidget) -> QFrame:
         card, form = _section(self._text(StringKey.MEDIA_SETTINGS), parent)
         self.audio_output = QComboBox(card)
+        self.audio_output.setAccessibleName(self._text(StringKey.DEFAULT_AUDIO_OUTPUT))
         self._add_options(
             self.audio_output,
-            (("Original", "original"), ("M4A", "m4a"), ("MP3", "mp3")),
+            ((self._text(StringKey.AUDIO_ORIGINAL), "original"), ("M4A", "m4a"), ("MP3", "mp3")),
         )
         form.addRow(self._text(StringKey.DEFAULT_AUDIO_OUTPUT), self.audio_output)
         self.audio_output.currentIndexChanged.connect(self._changed)
         return card
+
+    def _configure_accessibility(self) -> None:
+        QWidget.setTabOrder(self.theme, self.language)
+        QWidget.setTabOrder(self.language, self.folder)
+        QWidget.setTabOrder(self.folder, self.video_quality)
+        QWidget.setTabOrder(self.video_quality, self.video_container)
+        QWidget.setTabOrder(self.video_container, self.concurrency)
+        QWidget.setTabOrder(self.concurrency, self.audio_output)
+        QWidget.setTabOrder(self.audio_output, self.open_logs)
+        QWidget.setTabOrder(self.open_logs, self.reset_button)
+        QWidget.setTabOrder(self.reset_button, self.save_button)
+        complete_control_accessibility(self)
 
     def _advanced_section(self, parent: QWidget) -> QFrame:
         card, form = _section(self._text(StringKey.ADVANCED), parent)
@@ -349,6 +371,7 @@ class FirstRunDialog(QDialog):
             )
             configure.clicked.connect(self._configure)
         layout.addWidget(buttons)
+        complete_control_accessibility(self)
 
     def _continue(self) -> None:
         self.continued.emit()

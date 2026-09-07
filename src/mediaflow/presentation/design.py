@@ -129,6 +129,26 @@ def palette_for(theme: ResolvedTheme) -> PaletteTokens:
     return TOKENS.dark if theme is ResolvedTheme.DARK else TOKENS.light
 
 
+def contrast_ratio(first: str, second: str) -> float:
+    """Return WCAG contrast for token-level regression tests and future theme changes."""
+
+    first_luminance = _relative_luminance(first)
+    second_luminance = _relative_luminance(second)
+    lighter, darker = sorted((first_luminance, second_luminance), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _relative_luminance(color: str) -> float:
+    if len(color) != 7 or not color.startswith("#"):
+        raise ValueError("Palette colors must be six-digit hexadecimal values")
+    channels = tuple(int(color[index : index + 2], 16) / 255 for index in (1, 3, 5))
+    linear = tuple(
+        channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    )
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
 class ThemeController(QObject):
     """Apply Light, Dark, or the Qt-reported system appearance without restart."""
 
@@ -259,6 +279,9 @@ def build_stylesheet(palette: PaletteTokens) -> str:
             border: 1px solid {palette.border};
             border-radius: {radius.card}px;
         }}
+        QFrame#downloadCard[selectedTask="true"], QFrame#downloadCard:focus {{
+            border: 2px solid {palette.focus_ring};
+        }}
         QLabel#secondaryText, QLabel#helperText {{ color: {palette.text_secondary}; }}
         QLabel#errorText {{ color: {palette.error}; }}
         QPushButton {{
@@ -278,7 +301,16 @@ def build_stylesheet(palette: PaletteTokens) -> str:
             border: 1px solid {palette.border}; border-radius: {radius.control}px;
             padding: {spacing.small}px;
         }}
-        QLineEdit:focus, QComboBox:focus, QPushButton:focus, QToolButton:focus {{
+        QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPushButton:focus, QToolButton:focus {{
             border: 2px solid {palette.focus_ring};
         }}
+        QToolButton {{
+            border: 1px solid {palette.border}; border-radius: {radius.control}px;
+            color: {palette.text}; padding: {spacing.small}px {spacing.compact}px;
+        }}
+        QToolButton:checked {{ background: {palette.accent}; color: {palette.accent_text}; }}
+        QPushButton:disabled, QToolButton:disabled {{
+            color: {palette.disabled_text}; background: {palette.surface_raised};
+        }}
+        QLabel#screenReaderStatus {{ color: {palette.text_secondary}; }}
     """

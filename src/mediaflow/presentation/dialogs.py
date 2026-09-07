@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QWidget
 
 from mediaflow.application import ConflictPolicy, DiskSpaceEstimate
+from mediaflow.presentation.accessibility import complete_control_accessibility
 from mediaflow.presentation.strings import Localizer, StringKey
 
 
@@ -32,6 +33,7 @@ class ConflictDialog(QDialog):
         skip.clicked.connect(lambda: self._choose(ConflictPolicy.SKIP))
         replace.clicked.connect(lambda: self._choose(ConflictPolicy.REPLACE))
         layout.addWidget(buttons)
+        complete_control_accessibility(self)
 
     def _choose(self, policy: ConflictPolicy) -> None:
         self.decision = policy
@@ -63,6 +65,7 @@ class DiskSpaceWarningDialog(QDialog):
         choose.clicked.connect(self.choose_folder_requested)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        complete_control_accessibility(self)
 
 
 def _bytes_text(value: int) -> str:

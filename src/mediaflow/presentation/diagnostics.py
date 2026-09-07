@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from mediaflow.application import TaskDetailsView
+from mediaflow.presentation.accessibility import complete_control_accessibility
 from mediaflow.presentation.strings import Localizer, StringKey
 
 
@@ -114,6 +115,7 @@ class ErrorDetailsDialog(QDialog):
         copy_button.clicked.connect(self.copy_diagnostics)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
+        complete_control_accessibility(self)
 
     def copy_diagnostics(self) -> None:
         clipboard = QApplication.clipboard()
